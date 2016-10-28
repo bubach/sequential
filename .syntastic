@@ -1,0 +1,10 @@
+-W
+-Wall
+-Werror
+-Wno-unused-parameter
+-Wno-unused-function
+-std=c89
+-fPIC
+-pedantic
+-g
+
