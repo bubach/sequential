@@ -25,7 +25,7 @@ struct _seq_node_t {
 #define SEQ_SIZE sizeof(struct _seq_t)
 
 struct _seq_t {
-	seq_opt_t opts;
+	seq_opt_t type;
 	seq_size_t size;
 	seq_node_t front;
 	seq_node_t back;
@@ -337,44 +337,5 @@ seq_bool_t seq_vset(seq_t seq, seq_args_t args) {
 
 seq_size_t seq_size(seq_t seq) {
 	return seq->size;
-}
-
-/* ============================================================================================= */
-void seq_printall_str(seq_t seq) {
-	seq_node_t node = seq->front;
-	int i = 0;
-
-	printf("seq_t (%p) [ size=%d ] {\n", (void*)(seq), seq->size);
-	printf("   @f: (%p)\n", (void*)(seq->front));
-
-	while(node) {
-		printf(
-			"   %02d: (%p) [ data='%s' next='%s' prev='%s' ]\n",
-			i,
-			(void*)(node),
-			(char*)(node->data),
-			node->next ? (char*)(node->next->data) : "NUL",
-			node->prev ? (char*)(node->prev->data) : "NUL"
-		);
-
-		node = node->next;
-
-		i++;
-	}
-
-	printf("   @b: (%p)\n", (void*)(seq->back));
-	printf("}\n");
-}
-
-void seq_printall_ptr(seq_t seq) {
-	seq_node_t node = seq->front;
-	int i;
-
-	while(node) {
-		printf("%02d = \"%p\"\n", i, node->data);
-
-		node = node->next;
-		i++;
-	}
 }
 

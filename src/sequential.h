@@ -127,9 +127,6 @@ typedef void (*seq_cb_apply_t)(void* data, size_t index, seq_args_t args);
 SEQ_API void seq_apply(seq_t seq, seq_cb_apply_t apply, seq_enum_t opt, ...);
 #endif
 
-SEQ_API void seq_printall_str(seq_t seq);
-SEQ_API void seq_printall_ptr(seq_t seq);
-
 #ifdef __cplusplus
 }
 #endif
