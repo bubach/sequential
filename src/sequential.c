@@ -4,31 +4,33 @@
 #include <stdio.h>
 
 /* TODO:
- * - seq_flatten(seq_t seq): Convert data into a contiguous array_t.
  * - Compare performance against C++ STL.
- * - Create an explicit SEQ (or type) that takes advantage of Intel i5+ caching.
  * - SEQ_ITER_FILTER (callback to skip, etc; borrow from Ruby...)
  * - SEQ_ITER_TIME (gather start, stop and average per-iteration times)
- * - sort
- * - performance
- * - allocate entire node to include "data" at end */
+ * - sort */
 
 #define seq_args_copy(args_to, args_from) __va_copy(args_to, args_from)
-#define seq_opt(opt, mask) ((opt & mask) == mask)
+#define seq_opt(opt, mask) (opt <= mask##_MAX && ((opt & mask) == mask))
 
-typedef struct _seq_node_t seq_node_t;
+typedef struct _seq_node_t* seq_node_t;
+
+#define SEQ_NODE_SIZE sizeof(struct _seq_node_t)
 
 struct _seq_node_t {
 	seq_data_t data;
-	seq_node_t* next;
-	seq_node_t* prev;
+	seq_node_t next;
+	seq_node_t prev;
 };
 
+#define SEQ_SIZE sizeof(struct _seq_t)
+
 struct _seq_t {
-	seq_node_t* front;
-	seq_node_t* back;
+	seq_opt_t opts;
 	seq_size_t size;
-	seq_cb_t cb;
+	seq_node_t front;
+	seq_node_t back;
+	seq_cb_add_t add;
+	seq_cb_remove_t remove;
 };
 
 /* struct _seq_iter_t {
@@ -42,11 +44,7 @@ struct _seq_t {
 	unsigned int bits;
 }; */
 
-/* ==================================================================== Callbacks Implementation */
-static seq_data_t seq_cb_add(seq_args_t args) {
-	return seq_arg_data(args);
-}
-
+/* ============================================================================================= */
 static seq_data_t seq_cb_add_copy(seq_args_t args) {
 	seq_data_t dest = NULL;
 	seq_data_t src = seq_arg_data(args);
@@ -63,128 +61,77 @@ static seq_data_t seq_cb_add_copy(seq_args_t args) {
 	return dest;
 }
 
-static seq_bool_t seq_cb_remove(seq_data_t data) {
-	return SEQ_TRUE;
-}
-
-static seq_bool_t seq_cb_remove_free(seq_data_t data) {
+static void seq_cb_remove_free(seq_data_t data) {
 	free(data);
 }
 
-static seq_bool_t seq_cb_get() {
-	return SEQ_FALSE;
-}
-
-static seq_bool_t seq_cb_set() {
-	return SEQ_FALSE;
-}
-
-static seq_cb_t seq_cb = {
-	seq_cb_add,
-	seq_cb_remove,
-	seq_cb_get,
-	seq_cb_set
-};
-
-/* ========================================================================= Node Implementation */
-static void seq_node_destroy(seq_t seq, seq_node_t* node) {
-	seq->cb.remove(node->data);
+/* ============================================================================================= */
+static void seq_node_destroy(seq_t seq, seq_node_t node) {
+	if(seq->remove) seq->remove(node->data);
 
 	free(node);
 }
 
-#if 0
-/* TODO: Some way to determine if we should work backwards. */
-static seq_node_t* seq_node_get_data(seq_t seq, seq_args_t args) {
-	seq_node_t* node = seq_list(seq)->front;
-
-	while(node) {
-		seq_args_t args_copy;
-		seq_bool_t cmp;
-
-		seq_args_copy(args_copy, args);
-
-		cmp = seq->callbacks->compare(seq, node->data, args_copy);
-
-		va_end(args_copy);
-
-		if(!cmp) return node;
-
-		node = node->next;
-	}
-
-	return NULL;
-}
-#endif
-
-static seq_node_t* seq_node_get(seq_t seq, seq_args_t args) {
+static seq_node_t seq_node_get(seq_t seq, seq_args_t args) {
 	seq_opt_t get = seq_arg_opt(args);
-	seq_node_t* node = NULL;
+	seq_node_t node = NULL;
 
 	if(!seq_opt(get, SEQ_GET)) return NULL;
 
-	if(get & SEQ_INDEX) {
+	if(get == SEQ_INDEX) {
 		seq_size_t index = seq_arg_size(args);
-		seq_size_t sindex = index < 0 ? seq->size - abs(index) : index;
 		seq_size_t i;
 
-		if(index >= seq->size) return NULL;
+		index = index < 0 ? seq->size - abs(index) : index;
+
+		if(index >= seq->size || index < 0) return NULL;
 
 		/* If the index is PAST the middle of the list, work backwards. */
-		else if(seq->size / 2 < sindex) {
+		else if(index > seq->size / 2) {
 			node = seq->back;
 
-			for(i = 0; i < seq->size - sindex - 1; i--) node = node->prev;
+			for(i = 1; i < seq->size - index; i++) node = node->prev;
 		}
 
 		/* Otherwise, start from the front. */
 		else {
 			node = seq->front;
 
-			for(i = 0; i < sindex; i++) node = node->next;
+			for(i = 0; i < index; i++) node = node->next;
 		}
 	}
 
 	return node;
 }
 
-/* ========================================================================= Core Implementation */
+static seq_data_t seq_data(seq_t seq, seq_args_t args) {
+	if(!seq->add) return seq_arg_data(args);
+
+	else return seq->add(args);
+}
+
+/* ============================================================================================= */
 #define seq_vfunc(func, start, ret) \
 	seq_args_t args; \
 	va_start(args, start); \
 	ret = seq_v##func(start, args); \
 	va_end(args)
 
-seq_t seq_create(seq_opt_t opt, ...) {
-	seq_t seq = NULL;
-
-	seq_vfunc(create, opt, seq);
-
-	return seq;
-}
-
-seq_t seq_vcreate(seq_opt_t opt, seq_args_t args) {
-	seq_t seq = (seq_t)(malloc(sizeof(struct _seq_t)));
-	seq_opt_t o = opt;
+seq_t seq_create() {
+	seq_t seq = (seq_t)(malloc(SEQ_SIZE));
 
 	if(!seq) return NULL;
 
-	memcpy(&seq->cb, &seq_cb, sizeof(seq_cb_t));
-
-	while(o) {
-		if(!seq_opt(o, SEQ_OPT) || !seq_vset(seq, args)) break;
-
-		o = seq_arg_opt(args);
-	}
+	memset(seq, 0, SEQ_SIZE);
 
 	return seq;
 }
 
 void seq_destroy(seq_t seq) {
-	seq_node_t* node = seq->front;
+	seq_node_t node = seq->front;
 
 	while(node) {
-		seq_node_t* tmp = node->next;
+		seq_node_t tmp = node->next;
 
 		seq_node_destroy(seq, node);
 
@@ -203,22 +150,27 @@ seq_bool_t seq_add(seq_t seq, ...) {
 }
 
 seq_bool_t seq_vadd(seq_t seq, seq_args_t args) {
-	seq_node_t* node = NULL;
+	seq_node_t node = NULL;
 	seq_opt_t add = seq_arg_opt(args);
 
-	if(!seq_opt(add, SEQ_ADD) || !(node = (seq_node_t*)(malloc(sizeof(seq_node_t))))) goto err;
+	if(
+		!seq_opt(add, SEQ_ADD) ||
+		!(node = (seq_node_t)(malloc(SEQ_NODE_SIZE)))
+	) goto err;
 
-	if(add & (SEQ_APPEND | SEQ_PREPEND)) {
-		node->data = seq->cb.add(args);
+	memset(node, 0, SEQ_NODE_SIZE);
 
-		/* This is the FIRST node added; set the @front and @back of $list and quickly return. */
+	if(add == SEQ_APPEND || add == SEQ_PREPEND) {
+		if(!(node->data = seq_data(seq, args))) goto err;
+
+		/* This is the first node. */
 		if(!seq->front && !seq->back) {
 			seq->front = node;
 			seq->back = node;
 		}
 
 		else {
-			if(add & SEQ_APPEND) {
+			if(add == SEQ_APPEND) {
 				node->prev = seq->back;
 
 				seq->back->next = node;
@@ -226,7 +178,6 @@ seq_bool_t seq_vadd(seq_t seq, seq_args_t args) {
 			}
 
 			else {
-				node->prev = NULL;
 				node->next = seq->front;
 
 				seq->front->prev = node;
@@ -235,18 +186,40 @@ seq_bool_t seq_vadd(seq_t seq, seq_args_t args) {
 		}
 	}
 
-	else {
-		seq_node_t* pnode = seq_node_get(seq, args);
+	else if(add == SEQ_BEFORE || add == SEQ_AFTER || add == SEQ_REPLACE) {
+		seq_node_t pnode = seq_node_get(seq, args);
 
-		if(!pnode) goto err;
+		if(!pnode || !(node->data = seq_data(seq, args))) goto err;
 
-		if(add & SEQ_BEFORE) {
+		if(add == SEQ_BEFORE) {
+			node->next = pnode;
+			node->prev = pnode->prev;
+
+			if(pnode == seq->front) seq->front = node;
+
+			else pnode->prev->next = node;
+
+			pnode->prev = node;
 		}
 
-		else if(add & SEQ_AFTER) {
+		else if(add == SEQ_AFTER) {
+			node->next = pnode->next;
+			node->prev = pnode;
+
+			if(pnode == seq->back) seq->back = node;
+
+			else pnode->next->prev = node;
+
+			pnode->next = node;
 		}
 
+		/* TODO: Got to fix this. */
 		else {
+			pnode->data = node->data;
+
+			free(node);
+
+			return SEQ_TRUE;
 		}
 	}
 
@@ -269,7 +242,7 @@ seq_bool_t seq_remove(seq_t seq, ...) {
 }
 
 seq_bool_t seq_vremove(seq_t seq, seq_args_t args) {
-	seq_node_t* node = seq_node_get(seq, args);
+	seq_node_t node = seq_node_get(seq, args);
 
 	if(!node) return SEQ_FALSE;
 
@@ -281,14 +254,14 @@ seq_bool_t seq_vremove(seq_t seq, seq_args_t args) {
 
 	/* The very last node. */
 	else if(node->prev) {
-		node->prev->next = NULL;
+		if(node->prev) node->prev->next = NULL;
 
 		seq->back = node->prev;
 	}
 
 	/* The very first node. */
 	else {
-		node->next->prev = NULL;
+		if(node->next) node->next->prev = NULL;
 
 		seq->front = node->next;
 	}
@@ -309,7 +282,7 @@ seq_data_t seq_get(seq_t seq, ...) {
 }
 
 seq_data_t seq_vget(seq_t seq, seq_args_t args) {
-	seq_node_t* node = seq_node_get(seq, args);
+	seq_node_t node = seq_node_get(seq, args);
 
 	if(node) return node->data;
 
@@ -327,16 +300,7 @@ seq_bool_t seq_set(seq_t seq, ...) {
 seq_bool_t seq_vset(seq_t seq, seq_args_t args) {
 	seq_opt_t opt = seq_arg_opt(args);
 
-	if(opt == SEQ_CALLBACKS) {
-		seq_cb_t* cb = seq_arg(args, seq_cb_t*);
-
-		if(cb) {
-			if(cb->add) seq->cb.add = cb->add;
-			if(cb->remove) seq->cb.remove = cb->remove;
-			if(cb->get) seq->cb.get = cb->get;
-			if(cb->set) seq->cb.set = cb->set;
-		}
-	}
+	if(opt == SEQ_ARRAY) return SEQ_FALSE;
 
 	else if(opt == SEQ_MAP) return SEQ_FALSE;
 
@@ -346,9 +310,25 @@ seq_bool_t seq_vset(seq_t seq, seq_args_t args) {
 
 	else if(opt == SEQ_STACK) return SEQ_FALSE;
 
-	else if(opt == SEQ_ADD_COPY) seq->cb.add = seq_cb_add_copy;
+	else if(opt == SEQ_ON_ADD) {
+		seq_cb_add_t add = seq_arg(args, seq_cb_add_t);
 
-	else if(opt == SEQ_REMOVE_FREE) seq->cb.remove = seq_cb_remove_free;
+		if(!add) return SEQ_FALSE;
+
+		seq->add = add;
+	}
+
+	else if(opt == SEQ_ON_REMOVE) {
+		seq_cb_remove_t remove = seq_arg(args, seq_cb_remove_t);
+
+		if(!remove) return SEQ_FALSE;
+
+		seq->remove = remove;
+	}
+
+	else if(opt == SEQ_ADD_COPY) seq->add = seq_cb_add_copy;
+
+	else if(opt == SEQ_REMOVE_FREE) seq->remove = seq_cb_remove_free;
 
 	else return SEQ_FALSE;
 
@@ -357,5 +337,44 @@ seq_bool_t seq_vset(seq_t seq, seq_args_t args) {
 
 seq_size_t seq_size(seq_t seq) {
 	return seq->size;
+}
+
+/* ============================================================================================= */
+void seq_printall_str(seq_t seq) {
+	seq_node_t node = seq->front;
+	int i = 0;
+
+	printf("seq_t (%p) [ size=%d ] {\n", (void*)(seq), seq->size);
+	printf("   @f: (%p)\n", (void*)(seq->front));
+
+	while(node) {
+		printf(
+			"   %02d: (%p) [ data='%s' next='%s' prev='%s' ]\n",
+			i,
+			(void*)(node),
+			(char*)(node->data),
+			node->next ? (char*)(node->next->data) : "NUL",
+			node->prev ? (char*)(node->prev->data) : "NUL"
+		);
+
+		node = node->next;
+
+		i++;
+	}
+
+	printf("   @b: (%p)\n", (void*)(seq->back));
+	printf("}\n");
+}
+
+void seq_printall_ptr(seq_t seq) {
+	seq_node_t node = seq->front;
+	int i;
+
+	while(node) {
+		printf("%02d = \"%p\"\n", i, node->data);
+
+		node = node->next;
+		i++;
+	}
 }
 
