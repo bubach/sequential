@@ -6,7 +6,7 @@ extern "C" {
 #endif
 
 #if defined(_MSC_VER)
-	#define SEQ_API __declspec(dllimport)
+	#define SEQ_API __declspec(dllexport)
 
 #else
 	#define SEQ_API
