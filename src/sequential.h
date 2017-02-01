@@ -49,6 +49,7 @@ typedef void* seq_data_t;
 
 #define SEQ_NONE 0x0000
 
+/* TODO: SEQ_MULTI_{APPEND,PREPEND,SEND,PUSH} */
 #define SEQ_ADD 0x0100
 #define SEQ_APPEND (SEQ_ADD | 0x0001)
 #define SEQ_PREPEND (SEQ_ADD | 0x0002)
@@ -114,18 +115,27 @@ SEQ_API seq_bool_t seq_vset(seq_t seq, seq_args_t args);
 
 SEQ_API seq_size_t seq_size(seq_t seq);
 
-#if 0
-typedef struct _seq_iter_t {
-	uint8_t _private[32];
-} seq_iter_t;
-SEQ_API seq_iter_t* seq_iter_create(seq_enum_t opt, ...);
-SEQ_API void* seq_iter_data(seq_iter_t* iter);
-SEQ_API size_t seq_iter_index(seq_iter_t* iter);
-SEQ_API void seq_iter_stop(seq_iter_t* iter);
-SEQ_API seq_bool_t seq_iterate(seq_t seq, seq_iter_t* iter);
-typedef void (*seq_cb_apply_t)(void* data, size_t index, seq_args_t args);
-SEQ_API void seq_apply(seq_t seq, seq_cb_apply_t apply, seq_enum_t opt, ...);
-#endif
+/* ================================================================================== Iteration API
+ * seq_iter_create
+ * seq_iter_data
+ * seq_iter_index
+ * seq_iter_stop
+ * seq_iterate
+ * ============================================================================================= */
+
+typedef struct _seq_iter_t* seq_iter_t;
+
+SEQ_API seq_iter_t seq_iter_create(seq_t seq, ...);
+
+SEQ_API void seq_iter_destroy(seq_iter_t iter);
+
+SEQ_API seq_data_t seq_iter_data(seq_iter_t iter);
+
+SEQ_API seq_size_t seq_iter_index(seq_iter_t iter);
+
+SEQ_API void seq_iter_stop(seq_iter_t iter);
+
+SEQ_API seq_bool_t seq_iterate(seq_iter_t iter);
 
 #ifdef __cplusplus
 }

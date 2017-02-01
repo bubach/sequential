@@ -9,6 +9,8 @@
  * - SEQ_ITER_TIME (gather start, stop and average per-iteration times)
  * - sort */
 
+#define seq_args_start va_start
+#define seq_args_end va_end
 #define seq_args_copy(args_to, args_from) __va_copy(args_to, args_from)
 #define seq_opt(opt, mask) (opt <= mask##_MAX && ((opt & mask) == mask))
 
@@ -33,17 +35,6 @@ struct _seq_t {
 	seq_cb_remove_t remove;
 };
 
-/* struct _seq_iter_t {
-	seq_node_t* node;
-	seq_size_t index;
-	struct {
-		seq_size_t begin;
-		seq_size_t end;
-	} range;
-	seq_size_t stride;
-	unsigned int bits;
-}; */
-
 /* ============================================================================================= */
 static seq_data_t seq_cb_add_copy(seq_args_t args) {
 	seq_data_t dest = NULL;
@@ -66,28 +57,30 @@ static void seq_cb_remove_free(seq_data_t data) {
 }
 
 /* ============================================================================================= */
+static seq_size_t seq_index(seq_t seq, seq_size_t index) {
+	index = index < 0 ? seq->size - abs(index) : index;
+
+	if(index >= seq->size || index < 0) return -1;
+
+	return index;
+}
+
+/* ============================================================================================= */
 static void seq_node_destroy(seq_t seq, seq_node_t node) {
 	if(seq->remove) seq->remove(node->data);
 
 	free(node);
 }
 
-static seq_node_t seq_node_get(seq_t seq, seq_args_t args) {
-	seq_opt_t get = seq_arg_opt(args);
+static seq_node_t seq_node_get_index(seq_t seq, seq_size_t index) {
+	seq_size_t i;
 	seq_node_t node = NULL;
 
-	if(!seq_opt(get, SEQ_GET)) return NULL;
+	index = seq_index(seq, index);
 
-	if(get == SEQ_INDEX) {
-		seq_size_t index = seq_arg_size(args);
-		seq_size_t i;
-
-		index = index < 0 ? seq->size - abs(index) : index;
-
-		if(index >= seq->size || index < 0) return NULL;
-
+	if(index >= 0) {
 		/* If the index is PAST the middle of the list, work backwards. */
-		else if(index > seq->size / 2) {
+		if(index > seq->size / 2) {
 			node = seq->back;
 
 			for(i = 1; i < seq->size - index; i++) node = node->prev;
@@ -104,6 +97,18 @@ static seq_node_t seq_node_get(seq_t seq, seq_args_t args) {
 	return node;
 }
 
+static seq_node_t seq_node_get(seq_t seq, seq_args_t args) {
+	seq_opt_t get = seq_arg_opt(args);
+	seq_node_t node = NULL;
+
+	if(seq_opt(get, SEQ_GET) && get == SEQ_INDEX) node = seq_node_get_index(
+		seq,
+		seq_arg_size(args)
+	);
+
+	return node;
+}
+
 static seq_data_t seq_data(seq_t seq, seq_args_t args) {
 	if(!seq->add) return seq_arg_data(args);
 
@@ -113,9 +118,9 @@ static seq_data_t seq_data(seq_t seq, seq_args_t args) {
 /* ============================================================================================= */
 #define seq_vfunc(func, start, ret) \
 	seq_args_t args; \
-	va_start(args, start); \
+	seq_args_start(args, start); \
 	ret = seq_v##func(start, args); \
-	va_end(args)
+	seq_args_end(args)
 
 seq_t seq_create() {
 	seq_t seq = (seq_t)(malloc(SEQ_SIZE));
@@ -337,5 +342,83 @@ seq_bool_t seq_vset(seq_t seq, seq_args_t args) {
 
 seq_size_t seq_size(seq_t seq) {
 	return seq->size;
+}
+
+/* ============================================================================================= */
+struct _seq_iter_t {
+	seq_node_t node;
+	seq_size_t index;
+	seq_size_t begin;
+	seq_size_t end;
+	seq_size_t stride;
+	seq_bool_t stop;
+};
+
+#define SEQ_ITER_SIZE sizeof(struct _seq_iter_t)
+
+seq_iter_t seq_iter_create(seq_t seq, ...) {
+	seq_args_t args;
+	seq_opt_t opt = SEQ_NONE;
+	seq_iter_t iter = (seq_iter_t)(malloc(SEQ_ITER_SIZE));
+
+	iter->node = NULL;
+	iter->index = -1;
+	iter->begin = 0;
+	iter->end = seq->size - 1;
+	iter->stride = 1;
+	iter->stop = SEQ_FALSE;
+
+	seq_args_start(args, seq);
+
+	while((opt = seq_arg_opt(args))) {
+		if(opt == SEQ_RANGE) {
+			iter->begin = seq_index(seq, seq_arg_size(args));
+			iter->end = seq_index(seq, seq_arg_size(args));
+		}
+
+		else if(opt == SEQ_STRIDE) iter->stride = seq_arg_size(args);
+	}
+
+	seq_args_end(args);
+
+	iter->node = seq_node_get_index(seq, iter->begin);
+
+	return iter;
+}
+
+void seq_iter_destroy(seq_iter_t iter) {
+	free(iter);
+}
+
+seq_data_t seq_iter_data(seq_iter_t iter) {
+	return iter->node->data;
+}
+
+seq_size_t seq_iter_index(seq_iter_t iter) {
+	return iter->index;
+}
+
+void seq_iter_stop(seq_iter_t iter) {
+	iter->stop = SEQ_TRUE;
+}
+
+seq_bool_t seq_iterate(seq_iter_t iter) {
+	if(iter->stop) return SEQ_FALSE;
+
+	if(iter->index < 0) iter->index = iter->begin;
+
+	else {
+		seq_size_t i;
+
+		for(i = 0; i < iter->stride; i++) {
+			iter->node = iter->node->next;
+
+			if(!iter->node) return SEQ_FALSE;
+
+			iter->index++;
+		}
+	}
+
+	return SEQ_TRUE;
 }
 

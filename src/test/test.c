@@ -23,6 +23,21 @@ test_t* test_create(int i, float f, double d, const char* s) {
 	return t;
 }
 
+const char* test_strings[] = {
+	"foo", "Foo", "FOO",
+	"bar", "Bar", "BAR",
+	"baz", "Baz", "BAZ",
+	"qux", "Qux", "QUX"
+};
+
+const seq_size_t test_strings_size = 12;
+
+void test_strings_append(seq_t seq) {
+	seq_size_t i;
+
+	for(i = 0; i < test_strings_size; i++) seq_add(seq, SEQ_APPEND, test_strings[i]);
+}
+
 /* ============================================================================================= */
 SEQ_TEST_BEGIN(add_append_prepend)
 	SEQ_ASSERT( seq_add(seq, SEQ_APPEND, "bar") )
@@ -126,7 +141,7 @@ SEQ_TEST_BEGIN(on_add_remove)
 SEQ_TEST_END
 
 /* ============================================================================================= */
-SEQ_TEST_BEGIN(basic_errors)
+SEQ_TEST_BEGIN(add_errors)
 	SEQ_ASSERT( seq_add(seq, SEQ_APPEND, "foo") )
 	SEQ_ASSERT( !seq_add(seq, "bar") )
 	SEQ_ASSERT( !seq_add(seq, SEQ_APPEND, NULL) )
@@ -137,6 +152,32 @@ SEQ_TEST_BEGIN(basic_errors)
 SEQ_TEST_END
 
 /* ============================================================================================= */
+SEQ_TEST_BEGIN(iterate)
+	test_strings_append(seq);
+
+	{
+		seq_iter_t i = seq_iter_create(seq, SEQ_STRIDE, 3, SEQ_RANGE, 3, 9, SEQ_NONE);
+
+		while(seq_iterate(i)) {
+			seq_size_t index = seq_iter_index(i);
+			seq_data_t data = seq_iter_data(i);
+
+			test_info(
+				"index=%d data=%s test_strings[%d]=%s",
+				index,
+				(char*)(data),
+				index,
+				test_strings[index]
+			);
+
+			SEQ_ASSERT( strcmp(data, test_strings[index]) == 0 )
+		}
+
+		seq_iter_destroy(i);
+	}
+SEQ_TEST_END
+
+/* ============================================================================================= */
 int main(int argc, char** argv) {
 	test_add_append_prepend("SEQ_APPEND / SEQ_PREPEND");
 	test_add_before("SEQ_BEFORE");
@@ -144,7 +185,8 @@ int main(int argc, char** argv) {
 	test_add_replace("SEQ_REPLACE");
 	test_add_remove_copy("SEQ_ADD_COPY / SEQ_REMOVE_FREE");
 	test_on_add_remove("SEQ_ON_ADD / SEQ_ON_REMOVE");
-	/* test_basic_errors("tests add/remove error handling"); */
+	test_add_errors("SEQ_ADD (ERRORS)");
+	test_iterate("SEQ_STRIDE / SEQ_RANGE");
 
 	return 0;
 }

@@ -33,26 +33,16 @@
 #define TERM_WHITEB "47"
 
 #define SEQ_TEST_BEGIN(name) \
-seq_bool_t test_##name(const char* descr) { \
+void test_##name(const char* descr) { \
 	seq_t seq = seq_create(); \
-	seq_bool_t r = SEQ_TRUE; \
 	printf("============================================================\n"); \
 	printf("test_%s: %s\n", #name, descr); \
-	printf("============================================================\n"); {
+	printf("============================================================\n"); { \
 
-#define SEQ_TEST_END } \
-done: \
-	printf("\n"); \
-	if(seq) seq_destroy(seq); \
-	return r; \
-}
+#define SEQ_TEST_END } printf("\n"); }
 
 #define SEQ_ASSERT(expr) \
-	if(!(expr)) { \
-		printf(" >> [" TERM_ESC TERM_RED "mFAIL" TERM_ESC TERM_RESET "m] " #expr "\n"); \
-		r = SEQ_FALSE; \
-		goto done; \
-	} \
+	if(!(expr)) printf(" >> [" TERM_ESC TERM_RED "mFAIL" TERM_ESC TERM_RESET "m] " #expr "\n"); \
 	else printf(" >> [" TERM_ESC TERM_GREEN "mPASS" TERM_ESC TERM_RESET "m] " #expr "\n");
 
 void test_info(const char* fmt, ...) {
