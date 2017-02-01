@@ -17,6 +17,7 @@ extern "C" {
 #include <stdint.h>
 
 /* ======================================================================== Types, Constants, Enums
+ * SEQ_VERSION
  * seq_t
  * seq_bool_t
  * seq_size_t
@@ -24,6 +25,11 @@ extern "C" {
  * seq_cb_add_t
  * seq_cb_remove_t
  * ============================================================================================= */
+
+#define SEQ_VERSION_MAJOR 0
+#define SEQ_VERSION_MINOR 1
+#define SEQ_VERSION_BUGFIX 0
+#define SEQ_VERSION "0.1.0"
 
 typedef struct _seq_t* seq_t;
 
