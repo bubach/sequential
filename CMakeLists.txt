@@ -6,11 +6,13 @@ SET(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}")
 SET(SEQUENTIAL_STATIC TRUE CACHE BOOL "Enable static build of Sequential.")
 
 SET(SEQUENTIAL_SOURCE_FILES
-	"src/sequential.c"
+	"src/seq/seq-api.c"
+	"src/seq/seq-list.c"
 )
 
 SET(SEQUENTIAL_HEADER_FILES
 	"src/sequential.h"
+	"src/seq/seq-api.h"
 )
 
 INCLUDE_DIRECTORIES(src)
@@ -30,8 +32,8 @@ ADD_LIBRARY(sequential ${SEQUENTIAL_LIBRARY_TYPE}
 )
 
 ADD_EXECUTABLE(seq-test
-	"src/test/test.h"
-	"src/test/test.c"
+	"test/test.h"
+	"test/test.c"
 )
 
 TARGET_LINK_LIBRARIES(seq-test sequential)
