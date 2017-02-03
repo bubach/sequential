@@ -7,4 +7,5 @@
 -fPIC
 -pedantic
 -g
+-Isrc
 
