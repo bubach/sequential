@@ -1,7 +1,7 @@
-#ifndef TEST_H
-#define TEST_H
+#ifndef SEQUENTIAL_TEST_H
+#define SEQUENTIAL_TEST_H 1
 
-#include "../sequential.h"
+#include <sequential.h>
 
 #include <stdio.h>
 
@@ -39,13 +39,16 @@ void test_##name(const char* descr) { \
 	printf("test_%s: %s\n", #name, descr); \
 	printf("============================================================\n"); { \
 
-#define SEQ_TEST_END } printf("\n"); }
+#define SEQ_TEST_END } \
+	printf("\n"); \
+	seq_destroy(seq); \
+}
 
 #define SEQ_ASSERT(expr) \
 	if(!(expr)) printf(" >> [" TERM_ESC TERM_RED "mFAIL" TERM_ESC TERM_RESET "m] " #expr "\n"); \
 	else printf(" >> [" TERM_ESC TERM_GREEN "mPASS" TERM_ESC TERM_RESET "m] " #expr "\n");
 
-void test_info(const char* fmt, ...) {
+void test_printf(const char* fmt, ...) {
 	va_list args;
 	char buffer[1024];
 

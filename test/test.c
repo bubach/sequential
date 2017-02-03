@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>
+#include <stdlib.h>
 
 typedef struct _test_t {
 	int i;
@@ -11,7 +12,7 @@ typedef struct _test_t {
 	char s[64];
 } test_t;
 
-test_t* test_create(int i, float f, double d, const char* s) {
+static test_t* test_create(int i, float f, double d, const char* s) {
 	test_t* t = (test_t*)(malloc(sizeof(test_t)));
 
 	t->i = i;
@@ -21,6 +22,15 @@ test_t* test_create(int i, float f, double d, const char* s) {
 	strncpy(t->s, s, 64);
 
 	return t;
+}
+
+static void test_info(test_t* t) {
+	test_printf("test_t (%p) {", t);
+	test_printf("  i = %d", t->i);
+	test_printf("  f = %f", t->f);
+	test_printf("  d = %f", t->d);
+	test_printf("  s = %s", t->s);
+	test_printf("}");
 }
 
 const char* test_strings[] = {
@@ -99,23 +109,13 @@ SEQ_TEST_BEGIN(add_replace)
 SEQ_TEST_END
 
 /* ============================================================================================= */
-SEQ_TEST_BEGIN(add_remove_copy)
-	int i;
-	int* ints = (int*)(malloc(sizeof(int) * 100));
+SEQ_TEST_BEGIN(remove_free)
+	test_t* t = test_create(1, 2.2f, 33.33, "FOUR");
 
-	SEQ_ASSERT( seq_set(seq, SEQ_ADD_COPY) )
-	SEQ_ASSERT( seq_set(seq, SEQ_REMOVE_FREE) )
-
-	for(i = 0; i < 100; i++) ints[i] = i;
-
-	SEQ_ASSERT( ints[10] == 10 )
-	SEQ_ASSERT( seq_add(seq, SEQ_APPEND, ints, sizeof(int) * 100) )
-
-	free(ints);
-
-	SEQ_ASSERT( ((int*)(seq_get(seq, SEQ_INDEX, 0)))[10] == 10 )
-	SEQ_ASSERT( ((int*)(seq_get(seq, SEQ_INDEX, 0)))[21] == 21 )
-	SEQ_ASSERT( ((int*)(seq_get(seq, SEQ_INDEX, 0)))[99] == 99 )
+	SEQ_ASSERT( seq_set(seq, SEQ_ON_REMOVE_FREE) )
+	SEQ_ASSERT( seq_add(seq, SEQ_APPEND, t) )
+	SEQ_ASSERT( seq_remove(seq, SEQ_INDEX, 0) )
+	SEQ_ASSERT( seq_size(seq) == 0)
 SEQ_TEST_END
 
 /* ============================================================================================= */
@@ -130,7 +130,7 @@ seq_data_t on_add(seq_args_t args) {
 void on_remove(seq_data_t data) {
 	unsigned long d = (unsigned long)(data);
 
-	test_info("on_remove(%lu, %lu, %lu)", (d >> 24) & 0xFF, (d >> 16) & 0xFF, d & 0xFF);
+	test_printf("on_remove(%lu, %lu, %lu)", (d >> 24) & 0xFF, (d >> 16) & 0xFF, d & 0xFF);
 }
 
 SEQ_TEST_BEGIN(on_add_remove)
@@ -141,12 +141,36 @@ SEQ_TEST_BEGIN(on_add_remove)
 SEQ_TEST_END
 
 /* ============================================================================================= */
+seq_data_t on_add_addr(seq_args_t args) {
+	return seq_arg_data(args);
+}
+
+void on_remove_addr(seq_data_t data) {
+	seq_data_t* d = (seq_data_t*)(data);
+
+	free(*d);
+
+	*d = NULL;
+}
+
+SEQ_TEST_BEGIN(on_add_remove_addr)
+	test_t* t = test_create(1, 2.2f, 33.33, "FOUR");
+
+	SEQ_ASSERT( seq_set(seq, SEQ_ON_ADD, on_add_addr) )
+	SEQ_ASSERT( seq_set(seq, SEQ_ON_REMOVE, on_remove_addr) )
+	SEQ_ASSERT( seq_add(seq, SEQ_APPEND, &t) )
+	SEQ_ASSERT( t != NULL )
+	SEQ_ASSERT( seq_remove(seq, SEQ_INDEX, 0) )
+	SEQ_ASSERT( t == NULL )
+SEQ_TEST_END
+
+/* ============================================================================================= */
 SEQ_TEST_BEGIN(add_errors)
 	SEQ_ASSERT( seq_add(seq, SEQ_APPEND, "foo") )
 	SEQ_ASSERT( !seq_add(seq, "bar") )
 	SEQ_ASSERT( !seq_add(seq, SEQ_APPEND, NULL) )
-	SEQ_ASSERT( !seq_add(seq, SEQ_SEND, "baz") )
-	SEQ_ASSERT( !seq_add(seq, SEQ_ADD, "qux") )
+	/* SEQ_ASSERT( !seq_add(seq, SEQ_SEND, "baz") )
+	SEQ_ASSERT( !seq_add(seq, SEQ_ADD, "qux") ) */
 	SEQ_ASSERT( !seq_remove(seq, SEQ_INDEX, 1) )
 	SEQ_ASSERT( !seq_remove(seq, SEQ_INDEX, -3) )
 SEQ_TEST_END
@@ -156,16 +180,16 @@ SEQ_TEST_BEGIN(iterate)
 	test_strings_append(seq);
 
 	{
-		seq_iter_t i = seq_iter_create(seq, SEQ_STRIDE, 3, SEQ_RANGE, 3, 9, SEQ_NONE);
+		seq_iter_t i = seq_iter_create(seq, SEQ_INC, 3, SEQ_RANGE, 3, 9, SEQ_NONE);
 
 		while(seq_iterate(i)) {
-			seq_size_t index = seq_iter_index(i);
-			seq_data_t data = seq_iter_data(i);
+			seq_size_t index = (seq_size_t)((uint64_t)(seq_iter_get(i, SEQ_INDEX)));
+			char* data = seq_iter_get(i, SEQ_DATA);
 
-			test_info(
+			test_printf(
 				"index=%d data=%s test_strings[%d]=%s",
 				index,
-				(char*)(data),
+				data,
 				index,
 				test_strings[index]
 			);
@@ -183,10 +207,11 @@ int main(int argc, char** argv) {
 	test_add_before("SEQ_BEFORE");
 	test_add_after("SEQ_AFTER");
 	test_add_replace("SEQ_REPLACE");
-	test_add_remove_copy("SEQ_ADD_COPY / SEQ_REMOVE_FREE");
+	test_remove_free("SEQ_REMOVE_FREE");
 	test_on_add_remove("SEQ_ON_ADD / SEQ_ON_REMOVE");
+	test_on_add_remove_addr("SEQ_ON_ADD / SEQ_ON_REMOVE");
 	test_add_errors("SEQ_ADD (ERRORS)");
-	test_iterate("SEQ_STRIDE / SEQ_RANGE");
+	test_iterate("SEQ_INC / SEQ_RANGE");
 
 	return 0;
 }
