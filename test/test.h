@@ -34,7 +34,7 @@
 
 #define SEQ_TEST_BEGIN(name) \
 void test_##name(const char* descr) { \
-	seq_t seq = seq_create(); \
+	seq_t seq = seq_create(SEQ_LIST); \
 	printf("============================================================\n"); \
 	printf("test_%s: %s\n", #name, descr); \
 	printf("============================================================\n"); { \
