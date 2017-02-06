@@ -7,5 +7,5 @@
 -fPIC
 -pedantic
 -g
--Isrc
+-I/home/cubicool/projects/github/sequential/src
 
