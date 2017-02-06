@@ -23,7 +23,7 @@ typedef seq_bool_t (*seq_impl_remove_t)(seq_t seq, seq_args_t args);
 typedef seq_data_t (*seq_impl_get_t)(seq_t seq, seq_args_t args);
 typedef seq_bool_t (*seq_impl_set_t)(seq_t seq, seq_args_t args);
 
-typedef seq_iter_t (*seq_impl_iter_create_t)(seq_t seq, seq_args_t args);
+typedef void (*seq_impl_iter_create_t)(seq_iter_t iter, seq_args_t args);
 typedef void (*seq_impl_iter_destroy_t)(seq_iter_t iter);
 typedef seq_data_t (*seq_impl_iter_get_t)(seq_iter_t iter, seq_args_t args);
 typedef seq_bool_t (*seq_impl_iter_set_t)(seq_iter_t iter, seq_args_t args);
@@ -48,14 +48,36 @@ struct _seq_impl_t {
 	} iter;
 };
 
-#define SEQ_TYPE(type) \
+struct _seq_t {
+	seq_impl_t impl;
+	seq_data_t data;
+
+	struct {
+		seq_on_add_t add;
+		seq_on_remove_t remove;
+	} on;
+
+	seq_opt_t type;
+	seq_size_t size;
+};
+
+struct _seq_iter_t {
+	seq_data_t data;
+
+	seq_t seq;
+	seq_opt_t state;
+};
+
+seq_impl_t seq_impl_list();
+
+#define SEQ_TYPE_API(type) \
 	static void seq_##type##_create(seq_t seq); \
 	static void seq_##type##_destroy(seq_t seq); \
 	static seq_bool_t seq_##type##_add(seq_t seq, seq_args_t args); \
 	static seq_bool_t seq_##type##_remove(seq_t seq, seq_args_t args); \
 	static seq_data_t seq_##type##_get(seq_t seq, seq_args_t args); \
 	static seq_bool_t seq_##type##_set(seq_t seq, seq_args_t args); \
-	static seq_iter_t seq_##type##_iter_create(seq_t seq, seq_args_t args); \
+	static void seq_##type##_iter_create(seq_iter_t iter, seq_args_t args); \
 	static void seq_##type##_iter_destroy(seq_iter_t iter); \
 	static seq_data_t seq_##type##_iter_get(seq_iter_t iter, seq_args_t args); \
 	static seq_bool_t seq_##type##_iter_set(seq_iter_t iter, seq_args_t args); \
@@ -78,26 +100,6 @@ struct _seq_impl_t {
 	seq_impl_t seq_impl_##type() { \
 		return &SEQ_IMPL_##type; \
 	}
-
-struct _seq_t {
-	seq_impl_t impl;
-	seq_data_t data;
-
-	struct {
-		seq_on_add_t add;
-		seq_on_remove_t remove;
-	} on;
-
-	seq_opt_t type;
-	seq_size_t size;
-};
-
-struct _seq_iter_t {
-	seq_t seq;
-	seq_opt_t state;
-};
-
-seq_impl_t seq_impl_list();
 
 #endif
 

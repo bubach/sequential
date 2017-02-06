@@ -2,7 +2,7 @@
 
 typedef struct _seq_list_node_t* seq_list_node_t;
 typedef struct _seq_list_data_t* seq_list_data_t;
-typedef struct _seq_list_iter_t* seq_list_iter_t;
+typedef struct _seq_list_iter_data_t* seq_list_iter_data_t;
 
 struct _seq_list_node_t {
 	seq_data_t data;
@@ -15,9 +15,7 @@ struct _seq_list_data_t {
 	seq_list_node_t back;
 };
 
-struct _seq_list_iter_t {
-	struct _seq_iter_t iter;
-
+struct _seq_list_iter_data_t {
 	seq_list_node_t node;
 	seq_size_t index;
 	seq_size_t inc;
@@ -29,9 +27,9 @@ struct _seq_list_iter_t {
 };
 
 #define seq_list_data(seq) (seq_list_data_t)(seq->data)
-#define seq_list_iter(iter) (seq_list_iter_t)(iter)
+#define seq_list_iter_data(iter) (seq_list_iter_data_t)(iter->data)
 
-SEQ_TYPE(list)
+SEQ_TYPE_API(list)
 
 /* ============================================================================================= */
 static seq_size_t seq_list_index(seq_t seq, seq_size_t index) {
@@ -77,11 +75,9 @@ static seq_list_node_t seq_list_node_get_index(seq_t seq, seq_size_t index) {
 static seq_list_node_t seq_list_node_get(seq_t seq, seq_args_t args) {
 	seq_opt_t get = seq_arg_opt(args);
 	seq_list_node_t node = NULL;
+	seq_size_t index = seq_arg_size(args);
 
-	if(seq_opt(get, SEQ_GET) && get == SEQ_INDEX) node = seq_list_node_get_index(
-		seq,
-		seq_arg_size(args)
-	);
+	if(seq_opt(get, SEQ_GET) && get == SEQ_INDEX) node = seq_list_node_get_index(seq, index);
 
 	return node;
 }
@@ -248,72 +244,73 @@ static seq_bool_t seq_list_set(seq_t seq, seq_args_t args) {
 }
 
 /* ============================================================================================= */
-static seq_iter_t seq_list_iter_create(seq_t seq, seq_args_t args) {
-	seq_list_iter_t iter = seq_malloc(seq_list_iter_t);
+static void seq_list_iter_create(seq_iter_t iter, seq_args_t args) {
 	seq_opt_t opt = SEQ_NONE;
+	seq_list_iter_data_t data = iter->data;
 
-	iter->node = NULL;
-	iter->index = -1;
-	iter->range.begin = 0;
-	iter->range.end = seq->size - 1;
-	iter->inc = 1;
+	iter->data = seq_malloc(seq_list_iter_data_t);
+
+	if(!iter->data) return;
+
+	data->node = NULL;
+	data->index = -1;
+	data->range.begin = 0;
+	data->range.end = iter->seq->size - 1;
+	data->inc = 1;
 
 	while((opt = seq_arg_opt(args))) {
 		if(opt == SEQ_RANGE) {
-			iter->range.begin = seq_list_index(seq, seq_arg_size(args));
-			iter->range.end = seq_list_index(seq, seq_arg_size(args));
+			data->range.begin = seq_list_index(iter->seq, seq_arg_size(args));
+			data->range.end = seq_list_index(iter->seq, seq_arg_size(args));
 		}
 
-		else if(opt == SEQ_INC) iter->inc = seq_arg_size(args);
+		else if(opt == SEQ_INC) data->inc = seq_arg_size(args);
 	}
 
-	iter->node = seq_list_node_get_index(seq, iter->range.begin);
-
-	return (seq_iter_t)(iter);
+	data->node = seq_list_node_get_index(iter->seq, data->range.begin);
 }
 
 static void seq_list_iter_destroy(seq_iter_t iter) {
-	free(seq_list_iter(iter));
 }
 
 static seq_data_t seq_list_iter_get(seq_iter_t iter, seq_args_t args) {
-	seq_list_iter_t liter = seq_list_iter(iter);
+	seq_list_iter_data_t data = seq_list_iter_data(iter);
 	seq_opt_t get = seq_arg_opt(args);
 
 	if(seq_opt(get, SEQ_GET)) {
-		if(get == SEQ_INDEX) return (seq_data_t)(liter->index);
+		/* if(get == SEQ_INDEX) return (seq_data_t)(data->index); */
 
-		else if(get == SEQ_DATA) return liter->node->data;
+		if(get == SEQ_DATA) return data->node->data;
 	}
 
 	return NULL;
 }
 
 static seq_bool_t seq_list_iter_set(seq_iter_t iter, seq_args_t args) {
-	/* seq_list_iter_t liter = seq_list_iter(iter); */
+	/* seq_list_iter_data_t data = seq_list_iter_data(iter); */
 
 	return SEQ_FALSE;
 }
 
 static seq_bool_t seq_list_iter_iterate(seq_iter_t iter) {
-	seq_list_iter_t liter = seq_list_iter(iter);
+	seq_list_iter_data_t data = seq_list_iter_data(iter);
 
-	if(liter->iter.state == SEQ_STOP) return SEQ_FALSE;
+	if(iter->state == SEQ_STOP) return SEQ_FALSE;
 
-	else if(liter->iter.state == SEQ_READY) {
-		liter->iter.state = SEQ_ACTIVE;
-		liter->index = liter->range.begin;
+	else if(iter->state == SEQ_READY) {
+		iter->state = SEQ_ACTIVE;
+		data->index = data->range.begin;
 	}
 
 	else {
 		seq_size_t i;
 
-		for(i = 0; i < liter->inc; i++) {
-			liter->node = liter->node->next;
+		for(i = 0; i < data->inc; i++) {
+			data->node = data->node->next;
 
-			if(!liter->node) return SEQ_FALSE;
+			if(!data->node) return SEQ_FALSE;
 
-			liter->index++;
+			data->index++;
 		}
 	}
 

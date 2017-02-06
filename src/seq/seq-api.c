@@ -6,12 +6,16 @@ static void seq_on_remove_free(seq_data_t data) {
 }
 
 /* ============================================================================================= */
-seq_t seq_create() {
-	seq_t seq = seq_malloc(seq_t);
+seq_t seq_create(seq_opt_t type) {
+	seq_t seq = NULL;
 
-	if(!seq) return NULL;
+	if(seq_opt(type, SEQ_TYPE) && type == SEQ_LIST) {
+		seq = seq_malloc(seq_t);
 
-	seq_impl_list()->create(seq);
+		if(!seq) return NULL;
+
+		seq_impl_list()->create(seq);
+	}
 
 	return seq;
 }
@@ -130,16 +134,23 @@ seq_iter_t seq_iter_create(seq_t seq, ...) {
 }
 
 seq_iter_t seq_iter_vcreate(seq_t seq, seq_args_t args) {
-	seq_iter_t iter = seq->impl->iter.create(seq, args);
+	seq_iter_t iter = seq_malloc(seq_iter_t);
+
+	if(!iter) return NULL;
 
 	iter->seq = seq;
 	iter->state = SEQ_READY;
+
+	seq->impl->iter.create(iter, args);
 
 	return iter;
 }
 
 void seq_iter_destroy(seq_iter_t iter) {
 	iter->seq->impl->iter.destroy(iter);
+
+	free(iter->data);
+	free(iter);
 }
 
 seq_data_t seq_iter_get(seq_iter_t iter, ...) {

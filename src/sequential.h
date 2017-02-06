@@ -54,14 +54,18 @@ typedef int32_t seq_size_t;
 typedef va_list seq_args_t;
 typedef void* seq_data_t;
 
-#define seq_arg va_arg
-#define seq_arg_size(args) va_arg(args, seq_size_t)
-#define seq_arg_data(args) va_arg(args, seq_data_t)
-#define seq_arg_opt(args) va_arg(args, seq_opt_t)
-
 #define SEQ_NONE 0x0000
 
-#define SEQ_ADD 0x0100
+#define SEQ_TYPE 0x1111
+#define SEQ_LIST (SEQ_TYPE | 0x0001)
+#define SEQ_MAP (SEQ_TYPE | 0x0002)
+#define SEQ_RING (SEQ_TYPE | 0x0003)
+#define SEQ_QUEUE (SEQ_TYPE | 0x0004)
+#define SEQ_STACK (SEQ_TYPE | 0x0005)
+#define SEQ_ARRAY (SEQ_TYPE | 0x0006)
+#define SEQ_TYPE_MAX SEQ_ARRAY
+
+#define SEQ_ADD 0x2222
 #define SEQ_APPEND (SEQ_ADD | 0x0001)
 #define SEQ_PREPEND (SEQ_ADD | 0x0002)
 #define SEQ_BEFORE (SEQ_ADD | 0x0003)
@@ -72,7 +76,7 @@ typedef void* seq_data_t;
 #define SEQ_PUSH (SEQ_ADD | 0x0008)
 #define SEQ_ADD_MAX SEQ_PUSH
 
-#define SEQ_GET 0x0200
+#define SEQ_GET 0x3333
 #define SEQ_INDEX (SEQ_GET | 0x0001)
 #define SEQ_KEY (SEQ_GET | 0x0002)
 #define SEQ_RECV (SEQ_GET | 0x0003)
@@ -80,25 +84,20 @@ typedef void* seq_data_t;
 #define SEQ_DATA (SEQ_GET | 0x0005)
 #define SEQ_GET_MAX SEQ_DATA
 
-#define SEQ_ITER 0x0300
+#define SEQ_SET 0x4444
+#define SEQ_ON_ADD (SEQ_SET | 0x0007)
+#define SEQ_ON_REMOVE (SEQ_SET | 0x0008)
+#define SEQ_ON_REMOVE_FREE (SEQ_SET | 0x0009)
+#define SEQ_DEBUG (SEQ_SET | 0x000A)
+#define SEQ_SET_MAX SEQ_DEBUG
+
+#define SEQ_ITER 0x5555
 #define SEQ_READY (SEQ_ITER | 0x0001)
 #define SEQ_ACTIVE (SEQ_ITER | 0x0002)
 #define SEQ_STOP (SEQ_ITER | 0x0003)
 #define SEQ_RANGE (SEQ_ITER | 0x0004)
 #define SEQ_INC (SEQ_ITER | 0x0005)
 #define SEQ_ITER_MAX SEQ_INC
-
-#define SEQ_OPT 0x1000
-#define SEQ_LIST (SEQ_OPT | 0x0001)
-#define SEQ_MAP (SEQ_OPT | 0x0002)
-#define SEQ_RING (SEQ_OPT | 0x0003)
-#define SEQ_QUEUE (SEQ_OPT | 0x0004)
-#define SEQ_STACK (SEQ_OPT | 0x0005)
-#define SEQ_ARRAY (SEQ_OPT | 0x0006)
-#define SEQ_ON_ADD (SEQ_OPT | 0x0007)
-#define SEQ_ON_REMOVE (SEQ_OPT | 0x0008)
-#define SEQ_ON_REMOVE_FREE (SEQ_OPT | 0x0009)
-#define SEQ_OPT_MAX SEQ_ON_REMOVE_FREE
 
 /* The seq_on_add_t type defines the signature of an optional callback that will be used internally
  * by the seq_t instance when seq_add() is called. It is passed the remainder of the argument list
@@ -114,6 +113,11 @@ typedef seq_data_t (*seq_on_add_t)(seq_args_t args);
  * the value returned from the seq_on_add_t callback, if set). */
 typedef void (*seq_on_remove_t)(seq_data_t data);
 
+#define seq_arg va_arg
+#define seq_arg_size(args) va_arg(args, seq_size_t)
+#define seq_arg_data(args) va_arg(args, seq_data_t)
+#define seq_arg_opt(args) va_arg(args, seq_opt_t)
+
 /* ======================================================================================= Core API
  * seq_create
  * seq_destroy
@@ -121,11 +125,12 @@ typedef void (*seq_on_remove_t)(seq_data_t data);
  * seq_remove
  * seq_get
  * seq_set
+ * seq_type
  * seq_size
  * ============================================================================================= */
 
 /* Creates a new, empty seq_t instance using the SEQ_LIST implementation. */
-SEQ_API seq_t seq_create();
+SEQ_API seq_t seq_create(seq_opt_t type);
 
 /* Properly destroys all attached elements, and any implementation-specific data, of the passed-in
  * seq_t instance. */
@@ -149,9 +154,11 @@ SEQ_API seq_data_t seq_get(seq_t seq, ...);
 SEQ_API seq_data_t seq_vget(seq_t seq, seq_args_t args);
 
 /* This function provides a mechanism by which various behaviors of a seq_t instance can be enabled
- * and disabled. More information is available with the SEQ_OPT documentation. */
+ * and disabled. More information is available with the SEQ_SET documentation. */
 SEQ_API seq_bool_t seq_set(seq_t seq, ...);
 SEQ_API seq_bool_t seq_vset(seq_t seq, seq_args_t args);
+
+SEQ_API seq_opt_t seq_type(seq_t seq);
 
 /* Returns the number of nodes attached to this instance. */
 SEQ_API seq_size_t seq_size(seq_t seq);
