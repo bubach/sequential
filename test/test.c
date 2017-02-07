@@ -112,7 +112,7 @@ SEQ_TEST_END
 SEQ_TEST_BEGIN(remove_free)
 	test_t* t = test_create(1, 2.2f, 33.33, "FOUR");
 
-	SEQ_ASSERT( seq_set(seq, SEQ_ON_REMOVE_FREE) )
+	SEQ_ASSERT( seq_set(seq, SEQ_CB_REMOVE_FREE) )
 	SEQ_ASSERT( seq_add(seq, SEQ_APPEND, t) )
 	SEQ_ASSERT( seq_remove(seq, SEQ_INDEX, 0) )
 	SEQ_ASSERT( seq_size(seq) == 0)
@@ -134,8 +134,8 @@ void on_remove(seq_data_t data) {
 }
 
 SEQ_TEST_BEGIN(on_add_remove)
-	SEQ_ASSERT( seq_set(seq, SEQ_ON_ADD, on_add) )
-	SEQ_ASSERT( seq_set(seq, SEQ_ON_REMOVE, on_remove) )
+	SEQ_ASSERT( seq_set(seq, SEQ_CB_ADD, on_add) )
+	SEQ_ASSERT( seq_set(seq, SEQ_CB_REMOVE, on_remove) )
 	SEQ_ASSERT( seq_add(seq, SEQ_APPEND, 10, 20, 30) )
 	SEQ_ASSERT( seq_remove(seq, SEQ_INDEX, 0) )
 SEQ_TEST_END
@@ -156,8 +156,8 @@ void on_remove_addr(seq_data_t data) {
 SEQ_TEST_BEGIN(on_add_remove_addr)
 	test_t* t = test_create(1, 2.2f, 33.33, "FOUR");
 
-	SEQ_ASSERT( seq_set(seq, SEQ_ON_ADD, on_add_addr) )
-	SEQ_ASSERT( seq_set(seq, SEQ_ON_REMOVE, on_remove_addr) )
+	SEQ_ASSERT( seq_set(seq, SEQ_CB_ADD, on_add_addr) )
+	SEQ_ASSERT( seq_set(seq, SEQ_CB_REMOVE, on_remove_addr) )
 	SEQ_ASSERT( seq_add(seq, SEQ_APPEND, &t) )
 	SEQ_ASSERT( t != NULL )
 	SEQ_ASSERT( seq_remove(seq, SEQ_INDEX, 0) )
@@ -194,7 +194,6 @@ SEQ_TEST_BEGIN(iterate)
 				test_strings[index]
 			);
 
-			/* SEQ_ASSERT( strcmp(data, test_strings[index]) == 0 ) */
 			SEQ_ASSERT_STRCMP(data, test_strings[index] )
 		}
 
@@ -206,13 +205,13 @@ SEQ_TEST_END
 int main(int argc, char** argv) {
 	test_add_append_prepend("SEQ_APPEND / SEQ_PREPEND");
 	test_add_before("SEQ_BEFORE");
-	/* test_add_after("SEQ_AFTER");
+	test_add_after("SEQ_AFTER");
 	test_add_replace("SEQ_REPLACE");
 	test_remove_free("SEQ_REMOVE_FREE");
-	test_on_add_remove("SEQ_ON_ADD / SEQ_ON_REMOVE");
-	test_on_add_remove_addr("SEQ_ON_ADD / SEQ_ON_REMOVE");
+	test_on_add_remove("SEQ_CB_ADD / SEQ_CB_REMOVE");
+	test_on_add_remove_addr("SEQ_CB_ADD / SEQ_CB_REMOVE");
 	test_add_errors("SEQ_ADD (ERRORS)");
-	test_iterate("SEQ_INC / SEQ_RANGE"); */
+	test_iterate("SEQ_INC / SEQ_RANGE");
 
 	return 0;
 }

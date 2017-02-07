@@ -41,7 +41,7 @@ static seq_size_t seq_list_index(seq_t seq, seq_size_t index) {
 }
 
 static void seq_list_node_destroy(seq_t seq, seq_list_node_t node) {
-	if(seq->on.remove) seq->on.remove(node->data);
+	if(seq->set.remove) seq->set.remove(node->data);
 
 	free(node);
 }
@@ -83,9 +83,9 @@ static seq_list_node_t seq_list_node_get(seq_t seq, seq_args_t args) {
 }
 
 static seq_data_t seq_list_node_data(seq_t seq, seq_args_t args) {
-	if(!seq->on.add) return seq_arg_data(args);
+	if(!seq->set.add) return seq_arg_data(args);
 
-	else return seq->on.add(args);
+	else return seq->set.add(args);
 }
 
 /* ============================================================================================= */
@@ -246,11 +246,13 @@ static seq_bool_t seq_list_set(seq_t seq, seq_args_t args) {
 /* ============================================================================================= */
 static void seq_list_iter_create(seq_iter_t iter, seq_args_t args) {
 	seq_opt_t opt = SEQ_NONE;
-	seq_list_iter_data_t data = iter->data;
+	seq_list_iter_data_t data = NULL;
 
 	iter->data = seq_malloc(seq_list_iter_data_t);
 
 	if(!iter->data) return;
+
+	data = iter->data;
 
 	data->node = NULL;
 	data->index = -1;
@@ -278,9 +280,9 @@ static seq_data_t seq_list_iter_get(seq_iter_t iter, seq_args_t args) {
 	seq_opt_t get = seq_arg_opt(args);
 
 	if(seq_opt(get, SEQ_GET)) {
-		/* if(get == SEQ_INDEX) return (seq_data_t)(data->index); */
+		if(get == SEQ_INDEX) return (seq_data_t)((uint64_t)(data->index));
 
-		if(get == SEQ_DATA) return data->node->data;
+		else if(get == SEQ_DATA) return data->node->data;
 	}
 
 	return NULL;

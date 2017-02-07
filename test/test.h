@@ -35,13 +35,16 @@
 #define SEQ_TEST_BEGIN(name) \
 void test_##name(const char* descr) { \
 	seq_t seq = seq_create(SEQ_LIST); \
+	seq_set(seq, SEQ_DEBUG_STDOUT); \
+	seq_set(seq, SEQ_DEBUG_LEVEL, SEQ_TRACE); \
+	seq_set(seq, SEQ_DEBUG_PREFIX, " ** [" TERM_ESC TERM_MAGENTA "mDBUG" TERM_ESC TERM_RESET "m] "); \
 	printf("============================================================\n"); \
 	printf("test_%s: %s\n", #name, descr); \
 	printf("============================================================\n"); { \
 
 #define SEQ_TEST_END } \
-	printf("\n"); \
 	seq_destroy(seq); \
+	printf("\n"); \
 }
 
 #define SEQ_ASSERT(expr) \

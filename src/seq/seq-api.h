@@ -8,13 +8,9 @@
 
 #define seq_malloc(type) (type)(calloc(1, sizeof(struct _##type)))
 #define seq_opt(opt, mask) (opt <= mask##_MAX && ((opt & mask) == mask))
+#define seq_opt_val(opt) (opt & 0x0000FFFF)
 #define seq_args_start va_start
 #define seq_args_end va_end
-#define seq_args_wrap(func, start, ret) \
-	seq_args_t args; \
-	seq_args_start(args, start); \
-	ret = seq_##func(start, args); \
-	seq_args_end(args)
 
 typedef void (*seq_impl_create_t)(seq_t seq);
 typedef void (*seq_impl_destroy_t)(seq_t seq);
@@ -49,26 +45,41 @@ struct _seq_impl_t {
 };
 
 struct _seq_t {
-	seq_impl_t impl;
-	seq_data_t data;
-
-	struct {
-		seq_on_add_t add;
-		seq_on_remove_t remove;
-	} on;
-
 	seq_opt_t type;
 	seq_size_t size;
+
+	struct {
+		seq_cb_add_t add;
+		seq_cb_remove_t remove;
+
+		struct {
+			seq_cb_debug_t debug;
+			seq_data_t data;
+			seq_opt_t level;
+			seq_size_t depth;
+
+			const char* prefix;
+			const char* postfix;
+		} debug;
+	} set;
+
+	seq_impl_t impl;
+	seq_data_t data;
 };
 
 struct _seq_iter_t {
-	seq_data_t data;
-
 	seq_t seq;
 	seq_opt_t state;
+
+	seq_data_t data;
 };
 
 seq_impl_t seq_impl_list();
+
+void seq_trace_begin(seq_t seq, const char* fmt, ...);
+void seq_trace_end(seq_t seq, const char* fmt, ...);
+void seq_info(seq_t seq, const char* fmt, ...);
+void seq_error(seq_t seq, const char* fmt, ...);
 
 #define SEQ_TYPE_API(type) \
 	static void seq_##type##_create(seq_t seq); \

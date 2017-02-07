@@ -1,11 +1,38 @@
 #include "seq-api.h"
 
+#include <string.h>
+
+#define seq_args_wrap(func, start, ret) \
+	seq_args_t args; \
+	seq_args_start(args, start); \
+	ret = seq_##func(start, args); \
+	seq_args_end(args)
+
+#define seq_args_wrap_debug(seq, level, start) \
+	seq_args_t args; \
+	seq_args_start(args, start); \
+	seq_debug(seq, level, start, args); \
+	seq_args_end(args)
+
 /* ============================================================================================= */
-static void seq_on_remove_free(seq_data_t data) {
+static void seq_cb_remove_free(seq_data_t data) {
 	free(data);
 }
 
+static void seq_cb_debug_stdout(seq_opt_t level, const char* message, seq_data_t data) {
+	fprintf(stdout, message);
+}
+
+static void seq_cb_debug_stderr(seq_opt_t level, const char* message, seq_data_t data) {
+	fprintf(stderr, message);
+}
+
+static void seq_cb_debug_fwrite(seq_opt_t level, const char* message, seq_data_t data) {
+	fprintf((FILE*)(data), message);
+}
+
 /* ============================================================================================= */
+/* NOTE: We can't call seq_trace() here because we do not have a valid context. */
 seq_t seq_create(seq_opt_t type) {
 	seq_t seq = NULL;
 
@@ -13,6 +40,11 @@ seq_t seq_create(seq_opt_t type) {
 		seq = seq_malloc(seq_t);
 
 		if(!seq) return NULL;
+
+		seq->set.debug.prefix = "";
+		seq->set.debug.postfix = "";
+		seq->set.debug.level = SEQ_ERROR;
+		seq->set.debug.depth = 0;
 
 		seq_impl_list()->create(seq);
 	}
@@ -40,6 +72,8 @@ seq_bool_t seq_vadd(seq_t seq, seq_args_t args) {
 
 		return SEQ_TRUE;
 	}
+
+	seq_error(seq, "impl->add() callback failed");
 
 	return SEQ_FALSE;
 }
@@ -83,41 +117,56 @@ seq_bool_t seq_set(seq_t seq, ...) {
 }
 
 seq_bool_t seq_vset(seq_t seq, seq_args_t args) {
-	seq_opt_t opt = seq_arg_opt(args);
+	seq_opt_t set = seq_arg_opt(args);
 
-	if(opt == SEQ_LIST) return SEQ_FALSE;
+	if(!seq_opt(set, SEQ_SET)) return SEQ_FALSE;
 
-	else if(opt == SEQ_MAP) return SEQ_FALSE;
+	if(set == SEQ_CB_ADD) {
+		seq_cb_add_t add = seq_arg(args, seq_cb_add_t);
 
-	else if(opt == SEQ_RING) return SEQ_FALSE;
+		if(!add) return SEQ_FALSE;
 
-	else if(opt == SEQ_QUEUE) return SEQ_FALSE;
-
-	else if(opt == SEQ_STACK) return SEQ_FALSE;
-
-	else if(opt == SEQ_ARRAY) return SEQ_FALSE;
-
-	else if(opt == SEQ_ON_ADD) {
-		seq_on_add_t on_add = seq_arg(args, seq_on_add_t);
-
-		if(!on_add) return SEQ_FALSE;
-
-		seq->on.add = on_add;
+		seq->set.add = add;
 	}
 
-	else if(opt == SEQ_ON_REMOVE) {
-		seq_on_remove_t on_remove = seq_arg(args, seq_on_remove_t);
+	else if(set == SEQ_CB_REMOVE) {
+		seq_cb_remove_t remove = seq_arg(args, seq_cb_remove_t);
 
-		if(!on_remove) return SEQ_FALSE;
+		if(!remove) return SEQ_FALSE;
 
-		seq->on.remove = on_remove;
+		seq->set.remove = remove;
 	}
 
-	else if(opt == SEQ_ON_REMOVE_FREE) seq->on.remove = seq_on_remove_free;
+	else if(set == SEQ_CB_DEBUG) {
+		seq->set.debug.debug = seq_arg(args, seq_cb_debug_t);
+		seq->set.debug.data = seq_arg(args, FILE*);
+	}
 
-	else return SEQ_FALSE;
+	else if(set == SEQ_CB_REMOVE_FREE) seq->set.remove = seq_cb_remove_free;
+
+	else if(set == SEQ_DEBUG_STDOUT) seq->set.debug.debug = seq_cb_debug_stdout;
+
+	else if(set == SEQ_DEBUG_STDERR) seq->set.debug.debug = seq_cb_debug_stderr;
+
+	else if(set == SEQ_DEBUG_FWRITE) {
+		seq->set.debug.debug = seq_cb_debug_fwrite;
+		seq->set.debug.data = seq_arg(args, FILE*);
+	}
+
+	else if(set == SEQ_DEBUG_PREFIX) seq->set.debug.prefix = seq_arg(args, const char*);
+
+	else if(set == SEQ_DEBUG_POSTFIX) seq->set.debug.postfix = seq_arg(args, const char*);
+
+	/* TODO: Call impl->set() */
+	else {
+		return SEQ_FALSE;
+	}
 
 	return SEQ_TRUE;
+}
+
+seq_opt_t seq_type(seq_t seq) {
+	return seq->type;
 }
 
 seq_size_t seq_size(seq_t seq) {
@@ -179,5 +228,58 @@ seq_bool_t seq_iter_vset(seq_iter_t iter, seq_args_t args) {
 
 seq_bool_t seq_iterate(seq_iter_t iter) {
 	return iter->seq->impl->iter.iterate(iter);
+}
+
+/* ============================================================================================= */
+static const char* seq_level_str[] = { "TRACE", "INFO", "ERROR" };
+
+static void seq_debug(seq_t seq, seq_opt_t level, const char* fmt, seq_args_t args) {
+	if(
+		seq_opt(seq->set.debug.level, SEQ_LEVEL) &&
+		seq->set.debug.debug != NULL &&
+		seq_opt_val(level) <= seq_opt_val(seq->set.debug.level)
+	) {
+		char format[512];
+		char result[1024];
+		seq_size_t index = 0;
+
+		/* if(seq->set.debug.depth > 0) {
+			for(index = 0; index < seq->set.debug.depth; index++) result[index] = '.';
+		} */
+
+		sprintf(
+			format + index,
+			"%s[%s] %s%s (depth=%d)\n",
+			seq->set.debug.prefix,
+			seq_level_str[seq_opt_val(level) - 1],
+			fmt,
+			seq->set.debug.postfix,
+			seq->set.debug.depth
+		);
+
+		vsprintf(result, format, args);
+
+		seq->set.debug.debug(level, result, seq->set.debug.data);
+	}
+}
+
+void seq_trace_begin(seq_t seq, const char* fmt, ...) {
+	seq_args_wrap_debug(seq, SEQ_TRACE, fmt);
+
+	seq->set.debug.depth++;
+}
+
+void seq_trace_end(seq_t seq, const char* fmt, ...) {
+	seq->set.debug.depth--;
+
+	{ seq_args_wrap_debug(seq, SEQ_TRACE, fmt); }
+}
+
+void seq_info(seq_t seq, const char* fmt, ...) {
+	seq_args_wrap_debug(seq, SEQ_INFO, fmt);
+}
+
+void seq_error(seq_t seq, const char* fmt, ...) {
+	seq_args_wrap_debug(seq, SEQ_ERROR, fmt);
 }
 
