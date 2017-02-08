@@ -14,6 +14,7 @@ typedef struct _seq_list_iter_data_t* seq_list_iter_data_t;
 
 struct _seq_list_node_t {
 	seq_data_t data;
+	seq_size_t index;
 	seq_list_node_t next;
 	seq_list_node_t prev;
 };
@@ -215,6 +216,8 @@ static seq_bool_t seq_list_add(seq_t seq, seq_args_t args) {
 		}
 	}
 
+	node->index = seq->size;
+
 	return SEQ_TRUE;
 
 err:
@@ -254,12 +257,12 @@ static seq_bool_t seq_list_remove(seq_t seq, seq_args_t args) {
 	return SEQ_TRUE;
 }
 
-static seq_data_t seq_list_get(seq_t seq, seq_args_t args) {
+static seq_get_t seq_list_get(seq_t seq, seq_args_t args) {
 	seq_list_node_t node = seq_list_node_get(seq, args);
 
-	if(node) return node->data;
+	if(node) return seq_got_index(node->data, node->index);
 
-	return NULL;
+	return seq_got_null();
 }
 
 static seq_bool_t seq_list_set(seq_t seq, seq_args_t args) {
@@ -275,7 +278,7 @@ static seq_bool_t seq_list_set(seq_t seq, seq_args_t args) {
  * ============================================================================================= */
 
 static void seq_list_iter_create(seq_iter_t iter, seq_args_t args) {
-	seq_opt_t opt = SEQ_NONE;
+	seq_opt_t opt = SEQ_FALSE;
 	seq_list_iter_data_t data = NULL;
 
 	iter->data = seq_malloc(seq_list_iter_data_t);
@@ -305,17 +308,16 @@ static void seq_list_iter_create(seq_iter_t iter, seq_args_t args) {
 static void seq_list_iter_destroy(seq_iter_t iter) {
 }
 
-static seq_data_t seq_list_iter_get(seq_iter_t iter, seq_args_t args) {
+static seq_get_t seq_list_iter_get(seq_iter_t iter, seq_args_t args) {
 	seq_list_iter_data_t data = seq_list_iter_data(iter);
 	seq_opt_t get = seq_arg_opt(args);
 
-	if(seq_opt(get, SEQ_GET)) {
-		if(get == SEQ_INDEX) return (seq_data_t)((uint64_t)(data->index));
+	if(seq_opt(get, SEQ_GET) && get == SEQ_DATA) return seq_got_index(
+		data->node->data,
+		data->node->index
+	);
 
-		else if(get == SEQ_DATA) return data->node->data;
-	}
-
-	return NULL;
+	return seq_got_null();
 }
 
 static seq_bool_t seq_list_iter_set(seq_iter_t iter, seq_args_t args) {

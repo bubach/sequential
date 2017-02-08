@@ -23,7 +23,7 @@ extern "C" {
  * seq_size_t
  * seq_args_t
  * seq_data_t
- * seq_keyval_t
+ * seq_get_t
  * seq_cb_add_t
  * seq_cb_remove_t
  * seq_cb_debug_t
@@ -55,7 +55,18 @@ typedef int32_t seq_size_t;
 typedef va_list seq_args_t;
 typedef void* seq_data_t;
 
-#define SEQ_NONE 0x0000
+/* This structure is a special type returned by any of the "getter" routines within the Sequential
+ * library. It includes not only the data component, but the handle by which that data is retrieved.
+ * In most cases this is the numeric index of the node containing the data, but when using a SEQ_MAP
+ * instance, this could be any arbitrary type. */
+typedef struct _seq_get_t {
+	seq_data_t data;
+
+	union {
+		seq_data_t key;
+		seq_size_t index;
+	} handle;
+} seq_get_t;
 
 #define SEQ_TYPE 0x11110000
 #define SEQ_LIST (SEQ_TYPE | 0x0001)
@@ -165,14 +176,15 @@ SEQ_API seq_bool_t seq_vremove(seq_t seq, seq_args_t args);
 /* Retrieves the seq_data_t attached to the specified node. Just as with seq_add() and seq_remove(),
  * the internal instance implementation will determine the exact manner in which this routine is
  * used. */
-SEQ_API seq_data_t seq_get(seq_t seq, ...);
-SEQ_API seq_data_t seq_vget(seq_t seq, seq_args_t args);
+SEQ_API seq_get_t seq_get(seq_t seq, ...);
+SEQ_API seq_get_t seq_vget(seq_t seq, seq_args_t args);
 
 /* This function provides a mechanism by which various behaviors of a seq_t instance can be enabled
  * and disabled. More information is available with the SEQ_SET documentation. */
 SEQ_API seq_bool_t seq_set(seq_t seq, ...);
 SEQ_API seq_bool_t seq_vset(seq_t seq, seq_args_t args);
 
+/* Returns the SEQ_TYPE constants that this seq_t instance was created with. */
 SEQ_API seq_opt_t seq_type(seq_t seq);
 
 /* Returns the number of nodes attached to this instance. */
@@ -191,13 +203,24 @@ SEQ_API seq_iter_t seq_iter_vcreate(seq_t seq, seq_args_t args);
 
 SEQ_API void seq_iter_destroy(seq_iter_t iter);
 
-SEQ_API seq_data_t seq_iter_get(seq_iter_t iter, ...);
-SEQ_API seq_data_t seq_iter_vget(seq_iter_t iter, seq_args_t args);
+SEQ_API seq_get_t seq_iter_get(seq_iter_t iter, ...);
+SEQ_API seq_get_t seq_iter_vget(seq_iter_t iter, seq_args_t args);
 
 SEQ_API seq_bool_t seq_iter_set(seq_iter_t iter, ...);
 SEQ_API seq_bool_t seq_iter_vset(seq_iter_t iter, seq_args_t args);
 
 SEQ_API seq_bool_t seq_iterate(seq_iter_t iter);
+
+/* ============================================================================== Miscellaneous API
+ * seq_opt_str
+ * seq_save
+ * seq_restore
+ * ...
+ * ============================================================================================= */
+
+/* Converts the given constant--that is, one of the many SEQ_* defines--and returns its string
+ * representation. */
+SEQ_API const char* seq_opt_str(seq_opt_t opt);
 
 #ifdef __cplusplus
 }

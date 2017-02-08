@@ -37,17 +37,6 @@ static void seq_cb_debug_fwrite(seq_opt_t level, const char* message, seq_data_t
 	fprintf((FILE*)(data), message);
 }
 
-/* ============================================================================ Sequential Core API
- * seq_create
- * seq_destroy
- * seq_add
- * seq_remove
- * seq_get
- * seq_set
- * seq_type
- * seq_size
- * ============================================================================================= */
-
 seq_t seq_create(seq_opt_t type) {
 	seq_t seq = NULL;
 
@@ -111,15 +100,15 @@ seq_bool_t seq_vremove(seq_t seq, seq_args_t args) {
 	return SEQ_FALSE;
 }
 
-seq_data_t seq_get(seq_t seq, ...) {
-	seq_data_t data = NULL;
+seq_get_t seq_get(seq_t seq, ...) {
+	seq_get_t get;
 
-	seq_args_wrap(vget, seq, data);
+	seq_args_wrap(vget, seq, get);
 
-	return data;
+	return get;
 }
 
-seq_data_t seq_vget(seq_t seq, seq_args_t args) {
+seq_get_t seq_vget(seq_t seq, seq_args_t args) {
 	return seq->impl->get(seq, args);
 }
 
@@ -188,14 +177,6 @@ seq_size_t seq_size(seq_t seq) {
 	return seq->size;
 }
 
-/* ================================================================== Sequential Core Iteration API
- * seq_iter_create
- * seq_iter_destroy
- * seq_iter_get
- * seq_iter_set
- * seq_iterate
- * ============================================================================================= */
-
 seq_iter_t seq_iter_create(seq_t seq, ...) {
 	seq_iter_t iter = NULL;
 
@@ -224,15 +205,15 @@ void seq_iter_destroy(seq_iter_t iter) {
 	free(iter);
 }
 
-seq_data_t seq_iter_get(seq_iter_t iter, ...) {
-	seq_data_t data = NULL;
+seq_get_t seq_iter_get(seq_iter_t iter, ...) {
+	seq_get_t get;
 
-	seq_args_wrap(iter_vget, iter, data);
+	seq_args_wrap(iter_vget, iter, get);
 
-	return data;
+	return get;
 }
 
-seq_data_t seq_iter_vget(seq_iter_t iter, seq_args_t args) {
+seq_get_t seq_iter_vget(seq_iter_t iter, seq_args_t args) {
 	return iter->seq->impl->iter.get(iter, args);
 }
 
@@ -250,6 +231,93 @@ seq_bool_t seq_iter_vset(seq_iter_t iter, seq_args_t args) {
 
 seq_bool_t seq_iterate(seq_iter_t iter) {
 	return iter->seq->impl->iter.iterate(iter);
+}
+
+static const char* seq_opt_str_type[] = {
+	"SEQ_TYPE",
+	"SEQ_LIST",
+	"SEQ_MAP",
+	"SEQ_RING",
+	"SEQ_QUEUE",
+	"SEQ_STACK",
+	"SEQ_ARRAY"
+};
+
+static const char* seq_opt_str_add[] = {
+	"SEQ_ADD",
+	"SEQ_APPEND",
+	"SEQ_PREPEND",
+	"SEQ_BEFORE",
+	"SEQ_AFTER",
+	"SEQ_REPLACE",
+	"SEQ_KEYVAL",
+	"SEQ_SEND",
+	"SEQ_PUSH"
+};
+
+static const char* seq_opt_str_get[] = {
+	"SEQ_GET",
+	"SEQ_INDEX",
+	"SEQ_KEY",
+	"SEQ_RECV",
+	"SEQ_POP",
+	"SEQ_DATA"
+};
+
+static const char* seq_opt_str_set[] = {
+	"SEQ_SET",
+	"SEQ_CB_ADD",
+	"SEQ_CB_REMOVE",
+	"SEQ_CB_REMOVE_FREE",
+	"SEQ_CB_DEBUG",
+	"SEQ_DEBUG_STDOUT",
+	"SEQ_DEBUG_STDERR",
+	"SEQ_DEBUG_FWRITE",
+	"SEQ_DEBUG_PREFIX",
+	"SEQ_DEBUG_POSTFIX",
+	"SEQ_DEBUG_LEVEL"
+};
+
+static const char* seq_opt_str_iter[] = {
+	"SEQ_ITER",
+	"SEQ_READY",
+	"SEQ_ACTIVE",
+	"SEQ_STOP",
+	"SEQ_RANGE",
+	"SEQ_INC"
+};
+
+static const char* seq_opt_str_level[] = {
+	"SEQ_LEVEL",
+	"SEQ_TRACE",
+	"SEQ_INFO",
+	"SEQ_ERROR"
+};
+
+static const char** seq_opt_str_data[] = {
+	seq_opt_str_type,
+	seq_opt_str_add,
+	seq_opt_str_get,
+	seq_opt_str_set,
+	seq_opt_str_iter,
+	seq_opt_str_level
+};
+
+const char* seq_opt_str(seq_opt_t opt) {
+	if(opt == SEQ_FALSE) return "SEQ_FALSE";
+
+	else if(opt == SEQ_TRUE) return "SEQ_TRUE";
+
+	else if(
+		seq_opt(opt, SEQ_TYPE) ||
+		seq_opt(opt, SEQ_ADD) ||
+		seq_opt(opt, SEQ_GET) ||
+		seq_opt(opt, SEQ_SET) ||
+		seq_opt(opt, SEQ_ITER) ||
+		seq_opt(opt, SEQ_LEVEL)
+	) return seq_opt_str_data[((opt & 0x000F0000) >> 16) - 1][seq_opt_val(opt)];
+
+	else return "NULL";
 }
 
 /* ============================================================================ Debugging Functions
@@ -307,5 +375,35 @@ void seq_info(seq_t seq, const char* fmt, ...) {
 
 void seq_error(seq_t seq, const char* fmt, ...) {
 	seq_args_wrap_debug(seq, SEQ_ERROR, fmt);
+}
+
+/* ================================================================================ SEQ_GET Helpers
+ * seq_got_index
+ * seq_got_key
+ * seq_got_null
+ * ============================================================================================= */
+
+static seq_get_t seq_got(seq_data_t data, seq_data_t key, seq_size_t index) {
+	seq_get_t get;
+
+	get.data = data;
+
+	if(key) get.handle.key = key;
+
+	else get.handle.index = index;
+
+	return get;
+}
+
+seq_get_t seq_got_index(seq_data_t data, seq_size_t index) {
+	return seq_got(data, NULL, index);
+}
+
+seq_get_t seq_got_key(seq_data_t data, seq_data_t key) {
+	return seq_got(data, key, 0);
+}
+
+seq_get_t seq_got_null() {
+	return seq_got(NULL, NULL, 0);
 }
 
