@@ -17,7 +17,7 @@ typedef void (*seq_impl_destroy_t)(seq_t seq);
 typedef seq_bool_t (*seq_impl_add_t)(seq_t seq, seq_args_t args);
 typedef seq_bool_t (*seq_impl_remove_t)(seq_t seq, seq_args_t args);
 typedef seq_get_t (*seq_impl_get_t)(seq_t seq, seq_args_t args);
-typedef seq_bool_t (*seq_impl_set_t)(seq_t seq, seq_args_t args);
+typedef seq_bool_t (*seq_impl_set_t)(seq_t seq, seq_opt_t set, seq_args_t args);
 
 typedef void (*seq_impl_iter_create_t)(seq_iter_t iter, seq_args_t args);
 typedef void (*seq_impl_iter_destroy_t)(seq_iter_t iter);
@@ -91,7 +91,7 @@ seq_get_t seq_got_null();
 	static seq_bool_t seq_##type##_add(seq_t seq, seq_args_t args); \
 	static seq_bool_t seq_##type##_remove(seq_t seq, seq_args_t args); \
 	static seq_get_t seq_##type##_get(seq_t seq, seq_args_t args); \
-	static seq_bool_t seq_##type##_set(seq_t seq, seq_args_t args); \
+	static seq_bool_t seq_##type##_set(seq_t seq, seq_opt_t set, seq_args_t args); \
 	static void seq_##type##_iter_create(seq_iter_t iter, seq_args_t args); \
 	static void seq_##type##_iter_destroy(seq_iter_t iter); \
 	static seq_get_t seq_##type##_iter_get(seq_iter_t iter, seq_args_t args); \

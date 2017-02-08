@@ -265,8 +265,8 @@ static seq_get_t seq_list_get(seq_t seq, seq_args_t args) {
 	return seq_got_null();
 }
 
-static seq_bool_t seq_list_set(seq_t seq, seq_args_t args) {
-	return SEQ_TRUE;
+static seq_bool_t seq_list_set(seq_t seq, seq_opt_t set, seq_args_t args) {
+	return SEQ_FALSE;
 }
 
 /* ============================================================== SEQ_LIST Iteration Implementation

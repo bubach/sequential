@@ -14,12 +14,7 @@
 	seq_debug(seq, level, start, args); \
 	seq_args_end(args)
 
-/* ================================================================== Sequential Built-in Callbacks
- * seq_cb_remove_free
- * seq_cb_debug_stdout
- * seq_cb_debug_stderr
- * seq_cb_debug_fwrite
- * =========================-----------------------------------------------------------========= */
+/* =================================================================================== Callbacks */
 
 static void seq_cb_remove_free(seq_data_t data) {
 	free(data);
@@ -36,6 +31,8 @@ static void seq_cb_debug_stderr(seq_opt_t level, const char* message, seq_data_t
 static void seq_cb_debug_fwrite(seq_opt_t level, const char* message, seq_data_t data) {
 	fprintf((FILE*)(data), message);
 }
+
+/* ==================================================================================== Core API */
 
 seq_t seq_create(seq_opt_t type) {
 	seq_t seq = NULL;
@@ -161,10 +158,9 @@ seq_bool_t seq_vset(seq_t seq, seq_args_t args) {
 
 	else if(set == SEQ_DEBUG_POSTFIX) seq->set.debug.postfix = seq_arg(args, const char*);
 
-	/* TODO: Call impl->set() */
-	else {
-		return SEQ_FALSE;
-	}
+	else if(!seq->impl->set(seq, set, args)) return SEQ_FALSE;
+
+	else return SEQ_FALSE;
 
 	return SEQ_TRUE;
 }
@@ -176,6 +172,8 @@ seq_opt_t seq_type(seq_t seq) {
 seq_size_t seq_size(seq_t seq) {
 	return seq->size;
 }
+
+/* =============================================================================== Iteration API */
 
 seq_iter_t seq_iter_create(seq_t seq, ...) {
 	seq_iter_t iter = NULL;
@@ -232,6 +230,8 @@ seq_bool_t seq_iter_vset(seq_iter_t iter, seq_args_t args) {
 seq_bool_t seq_iterate(seq_iter_t iter) {
 	return iter->seq->impl->iter.iterate(iter);
 }
+
+/* =========================================================================== Miscellaneous API */
 
 static const char* seq_opt_str_type[] = {
 	"SEQ_TYPE",
@@ -320,10 +320,7 @@ const char* seq_opt_str(seq_opt_t opt) {
 	else return "NULL";
 }
 
-/* ============================================================================ Debugging Functions
- * seq_info
- * seq_error
- * ============================================================================================= */
+/* =================================================================================== Debugging */
 
 static const char* seq_level_str[] = { "TRACE", "INFO", "ERROR" };
 
@@ -377,11 +374,7 @@ void seq_error(seq_t seq, const char* fmt, ...) {
 	seq_args_wrap_debug(seq, SEQ_ERROR, fmt);
 }
 
-/* ================================================================================ SEQ_GET Helpers
- * seq_got_index
- * seq_got_key
- * seq_got_null
- * ============================================================================================= */
+/* ============================================================================= SEQ_GET Helpers */
 
 static seq_get_t seq_got(seq_data_t data, seq_data_t key, seq_size_t index) {
 	seq_get_t get;
