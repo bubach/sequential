@@ -52,7 +52,7 @@ void test_##name(const char* descr) { \
 	else printf(" >> [" TERM_ESC TERM_GREEN "mPASS" TERM_ESC TERM_RESET "m] " #expr "\n");
 
 #define SEQ_ASSERT_STRCMP(expr, str) \
-	if(strcmp(expr, str)) printf(" >> [" TERM_ESC TERM_RED "mFAIL" TERM_ESC TERM_RESET \
+	if(strcmp((expr).data, str)) printf(" >> [" TERM_ESC TERM_RED "mFAIL" TERM_ESC TERM_RESET \
 		"m] " #expr " == %s\n", str); \
 	else printf(" >> [" TERM_ESC TERM_GREEN "mPASS" TERM_ESC TERM_RESET \
 		"m] " #expr " == %s\n", str);

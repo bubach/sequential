@@ -174,21 +174,20 @@ SEQ_TEST_BEGIN(iterate)
 	test_strings_append(seq);
 
 	{
-		seq_iter_t i = seq_iter_create(seq, SEQ_INC, 3, SEQ_RANGE, 3, 9, SEQ_NONE);
+		seq_iter_t i = seq_iter_create(seq, SEQ_INC, 3, SEQ_RANGE, 3, 9, SEQ_FALSE);
 
 		while(seq_iterate(i)) {
-			seq_size_t index = (seq_size_t)((uint64_t)(seq_iter_get(i, SEQ_INDEX)));
-			char* data = seq_iter_get(i, SEQ_DATA);
+			seq_get_t get = seq_iter_get(i, SEQ_DATA);
 
 			test_printf(
 				"index=%d data=%s test_strings[%d]=%s",
-				index,
-				data,
-				index,
-				test_strings[index]
+				get.handle.index,
+				get.data,
+				get.handle.index,
+				test_strings[get.handle.index]
 			);
 
-			SEQ_ASSERT_STRCMP(data, test_strings[index] )
+			SEQ_ASSERT_STRCMP(get, test_strings[get.handle.index] )
 		}
 
 		seq_iter_destroy(i);
