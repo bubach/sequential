@@ -31,10 +31,11 @@ ADD_LIBRARY(sequential ${SEQUENTIAL_LIBRARY_TYPE}
 	${SEQUENTIAL_SOURCE_FILES}
 )
 
-ADD_EXECUTABLE(seq-test
-	"test/test.h"
-	"test/test.c"
-)
+TARGET_LINK_LIBRARIES(sequential dl)
 
+ADD_EXECUTABLE(seq-test "test/seq-test.h" "test/seq-test.c")
 TARGET_LINK_LIBRARIES(seq-test sequential)
+
+ADD_EXECUTABLE(seq-tmp "test/seq-tmp.c")
+TARGET_LINK_LIBRARIES(seq-tmp sequential)
 
