@@ -1,5 +1,13 @@
 #include "seq-api.h"
 
+/* ======================================================================== Types, Constants, Enums
+ * struct _seq_list_node_t
+ * struct _seq_list_data_t
+ * struct _seq_list_iter_data_t
+ * seq_list_data
+ * seq_list_iter_data
+ * SEQ_TYPE_API(list)
+ * --------------------------------------------------------------------------------------------- */
 typedef struct _seq_list_node_t* seq_list_node_t;
 typedef struct _seq_list_data_t* seq_list_data_t;
 typedef struct _seq_list_iter_data_t* seq_list_iter_data_t;
@@ -31,7 +39,14 @@ struct _seq_list_iter_data_t {
 
 SEQ_TYPE_API(list)
 
-/* ============================================================================================= */
+/* =========================================================================== Private List Helpers
+ * seq_list_index
+ * seq_list_node_destroy
+ * seq_list_node_get_index
+ * seq_list_node_get
+ * seq_list_node_data
+ * ============================================================================================= */
+
 static seq_size_t seq_list_index(seq_t seq, seq_size_t index) {
 	index = index < 0 ? seq->size - abs(index) : index;
 
@@ -88,7 +103,15 @@ static seq_data_t seq_list_node_data(seq_t seq, seq_args_t args) {
 	else return seq->set.add(args);
 }
 
-/* ============================================================================================= */
+/* ======================================================================== SEQ_LIST Implementation
+ * seq_list_create
+ * seq_list_destroy
+ * seq_list_add
+ * seq_list_remove
+ * seq_list_get
+ * seq_list_set
+ * ============================================================================================= */
+
 static void seq_list_create(seq_t seq) {
 	seq->type = SEQ_LIST;
 	seq->impl = seq_impl_list();
@@ -243,7 +266,14 @@ static seq_bool_t seq_list_set(seq_t seq, seq_args_t args) {
 	return SEQ_TRUE;
 }
 
-/* ============================================================================================= */
+/* ============================================================== SEQ_LIST Iteration Implementation
+ * seq_list_iter_create
+ * seq_list_iter_destroy
+ * seq_list_iter_get
+ * seq_list_iter_set
+ * seq_list_iter_iterate
+ * ============================================================================================= */
+
 static void seq_list_iter_create(seq_iter_t iter, seq_args_t args) {
 	seq_opt_t opt = SEQ_NONE;
 	seq_list_iter_data_t data = NULL;

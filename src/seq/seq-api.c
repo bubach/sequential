@@ -14,7 +14,13 @@
 	seq_debug(seq, level, start, args); \
 	seq_args_end(args)
 
-/* ============================================================================================= */
+/* ================================================================== Sequential Built-in Callbacks
+ * seq_cb_remove_free
+ * seq_cb_debug_stdout
+ * seq_cb_debug_stderr
+ * seq_cb_debug_fwrite
+ * =========================-----------------------------------------------------------========= */
+
 static void seq_cb_remove_free(seq_data_t data) {
 	free(data);
 }
@@ -31,8 +37,17 @@ static void seq_cb_debug_fwrite(seq_opt_t level, const char* message, seq_data_t
 	fprintf((FILE*)(data), message);
 }
 
-/* ============================================================================================= */
-/* NOTE: We can't call seq_trace() here because we do not have a valid context. */
+/* ============================================================================ Sequential Core API
+ * seq_create
+ * seq_destroy
+ * seq_add
+ * seq_remove
+ * seq_get
+ * seq_set
+ * seq_type
+ * seq_size
+ * ============================================================================================= */
+
 seq_t seq_create(seq_opt_t type) {
 	seq_t seq = NULL;
 
@@ -173,7 +188,14 @@ seq_size_t seq_size(seq_t seq) {
 	return seq->size;
 }
 
-/* ============================================================================================= */
+/* ================================================================== Sequential Core Iteration API
+ * seq_iter_create
+ * seq_iter_destroy
+ * seq_iter_get
+ * seq_iter_set
+ * seq_iterate
+ * ============================================================================================= */
+
 seq_iter_t seq_iter_create(seq_t seq, ...) {
 	seq_iter_t iter = NULL;
 
@@ -230,7 +252,11 @@ seq_bool_t seq_iterate(seq_iter_t iter) {
 	return iter->seq->impl->iter.iterate(iter);
 }
 
-/* ============================================================================================= */
+/* ============================================================================ Debugging Functions
+ * seq_info
+ * seq_error
+ * ============================================================================================= */
+
 static const char* seq_level_str[] = { "TRACE", "INFO", "ERROR" };
 
 static void seq_debug(seq_t seq, seq_opt_t level, const char* fmt, seq_args_t args) {
