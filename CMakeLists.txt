@@ -31,7 +31,9 @@ ADD_LIBRARY(sequential ${SEQUENTIAL_LIBRARY_TYPE}
 	${SEQUENTIAL_SOURCE_FILES}
 )
 
-TARGET_LINK_LIBRARIES(sequential dl)
+IF(NOT WIN32)
+	TARGET_LINK_LIBRARIES(sequential dl)
+ENDIF()
 
 ADD_EXECUTABLE(seq-test "test/seq-test.h" "test/seq-test.c")
 TARGET_LINK_LIBRARIES(seq-test sequential)
