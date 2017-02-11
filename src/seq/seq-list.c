@@ -8,13 +8,13 @@
  * seq_list_iter_data
  * SEQ_TYPE_API(list)
  * --------------------------------------------------------------------------------------------- */
+
 typedef struct _seq_list_node_t* seq_list_node_t;
 typedef struct _seq_list_data_t* seq_list_data_t;
 typedef struct _seq_list_iter_data_t* seq_list_iter_data_t;
 
 struct _seq_list_node_t {
 	seq_data_t data;
-	seq_size_t index;
 	seq_list_node_t next;
 	seq_list_node_t prev;
 };
@@ -34,6 +34,11 @@ struct _seq_list_iter_data_t {
 		seq_size_t end;
 	} range;
 };
+
+typedef struct _seq_list_node_get_t {
+	seq_list_node_t node;
+	seq_size_t index;
+} seq_list_node_get_t;
 
 #define seq_list_data(seq) (seq_list_data_t)(seq->data)
 #define seq_list_iter_data(iter) (seq_list_iter_data_t)(iter->data)
@@ -88,14 +93,17 @@ static seq_list_node_t seq_list_node_get_index(seq_t seq, seq_size_t index) {
 	return node;
 }
 
-static seq_list_node_t seq_list_node_get(seq_t seq, seq_args_t args) {
-	seq_opt_t get = seq_arg_opt(args);
-	seq_list_node_t node = NULL;
+static seq_list_node_get_t seq_list_node_get(seq_t seq, seq_args_t args) {
+	seq_list_node_get_t get;
+	seq_opt_t opt = seq_arg_opt(args);
 	seq_size_t index = seq_arg_size(args);
 
-	if(seq_opt(get, SEQ_GET) && get == SEQ_INDEX) node = seq_list_node_get_index(seq, index);
+	if(seq_opt(opt, SEQ_GET) && opt == SEQ_INDEX) {
+		get.node = seq_list_node_get_index(seq, index);
+		get.index = index;
+	}
 
-	return node;
+	return get;
 }
 
 static seq_data_t seq_list_node_data(seq_t seq, seq_args_t args) {
@@ -139,10 +147,7 @@ static seq_bool_t seq_list_add(seq_t seq, seq_args_t args) {
 	seq_list_node_t node = NULL;
 	seq_opt_t add = seq_arg_opt(args);
 
-	if(
-		!seq_opt(add, SEQ_ADD) ||
-		!(node = seq_malloc(seq_list_node_t))
-	) goto err;
+	if(!seq_opt(add, SEQ_ADD) || !(node = seq_malloc(seq_list_node_t))) goto err;
 
 	if(add == SEQ_APPEND || add == SEQ_PREPEND) {
 		if(!(node->data = seq_list_node_data(seq, args))) goto err;
@@ -171,7 +176,7 @@ static seq_bool_t seq_list_add(seq_t seq, seq_args_t args) {
 	}
 
 	else if(add == SEQ_BEFORE || add == SEQ_AFTER || add == SEQ_REPLACE) {
-		seq_list_node_t pnode = seq_list_node_get(seq, args);
+		seq_list_node_t pnode = seq_list_node_get(seq, args).node;
 
 		if(!pnode || !(node->data = seq_list_node_data(seq, args))) goto err;
 
@@ -216,8 +221,6 @@ static seq_bool_t seq_list_add(seq_t seq, seq_args_t args) {
 		}
 	}
 
-	node->index = seq->size;
-
 	return SEQ_TRUE;
 
 err:
@@ -228,7 +231,7 @@ err:
 
 static seq_bool_t seq_list_remove(seq_t seq, seq_args_t args) {
 	seq_list_data_t data = seq_list_data(seq);
-	seq_list_node_t node = seq_list_node_get(seq, args);
+	seq_list_node_t node = seq_list_node_get(seq, args).node;
 
 	if(!node) return SEQ_FALSE;
 
@@ -258,9 +261,9 @@ static seq_bool_t seq_list_remove(seq_t seq, seq_args_t args) {
 }
 
 static seq_get_t seq_list_get(seq_t seq, seq_args_t args) {
-	seq_list_node_t node = seq_list_node_get(seq, args);
+	seq_list_node_get_t get = seq_list_node_get(seq, args);
 
-	if(node) return seq_got_index(node->data, node->index);
+	if(get.node) return seq_got_index(get.node->data, get.index);
 
 	return seq_got_null();
 }
@@ -314,7 +317,7 @@ static seq_get_t seq_list_iter_get(seq_iter_t iter, seq_args_t args) {
 
 	if(seq_opt(get, SEQ_GET) && get == SEQ_DATA) return seq_got_index(
 		data->node->data,
-		data->node->index
+		data->index
 	);
 
 	return seq_got_null();

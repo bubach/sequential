@@ -35,6 +35,7 @@ static test_t* test_create(int i, float f, double d, const char* s) {
 } */
 
 const seq_size_t test_strings_size = 12;
+
 const char* test_strings[] = {
 	"foo", "Foo", "FOO",
 	"bar", "Bar", "BAR",
@@ -200,11 +201,11 @@ typedef struct _test_func_t {
 	const char* descr;
 } test_func_t;
 
-#define TEST_FUNC(name, descr) { test_##name, #name, #descr }
+#define TEST_FUNC(name, descr) { test_##name, #name, descr }
 
 const seq_size_t test_funcs_size = 9;
 const test_func_t test_funcs[] = {
-	TEST_FUNC(add_append_prepend, "SEE_APPEND / SEQ_PREPEND"),
+	TEST_FUNC(add_append_prepend, "SEQ_APPEND / SEQ_PREPEND"),
 	TEST_FUNC(add_before, "SEQ_BEFORE"),
 	TEST_FUNC(add_after, "SEQ_AFTER"),
 	TEST_FUNC(add_replace, "SEQ_REPLACE"),

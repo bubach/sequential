@@ -32,12 +32,17 @@
 #define TERM_CYANB "46"
 #define TERM_WHITEB "47"
 
+#define TEST_DBUG TERM_ESC TERM_MAGENTA "mDBUG" TERM_ESC TERM_RESET "m"
+#define TEST_INFO TERM_ESC TERM_CYAN "mINFO" TERM_ESC TERM_RESET "m"
+#define TEST_PASS TERM_ESC TERM_GREEN "mPASS" TERM_ESC TERM_RESET "m"
+#define TEST_FAIL TERM_ESC TERM_RED "mFAIL" TERM_ESC TERM_RESET "m"
+
 #define SEQ_TEST_BEGIN(name) \
 void test_##name(const char* descr) { \
 	seq_t seq = seq_create(SEQ_LIST); \
 	seq_set(seq, SEQ_DEBUG_STDOUT); \
-	seq_set(seq, SEQ_DEBUG_LEVEL, SEQ_TRACE); \
-	seq_set(seq, SEQ_DEBUG_PREFIX, " ** [" TERM_ESC TERM_MAGENTA "mDBUG" TERM_ESC TERM_RESET "m] "); \
+	seq_set(seq, SEQ_DEBUG_LEVEL, SEQ_INFO); \
+	seq_set(seq, SEQ_DEBUG_PREFIX, " ** [" TEST_DBUG "] "); \
 	printf("============================================================\n"); \
 	printf("test_%s: %s\n", #name, descr); \
 	printf("============================================================\n"); { \
@@ -48,14 +53,12 @@ void test_##name(const char* descr) { \
 }
 
 #define SEQ_ASSERT(expr) \
-	if(!(expr)) printf(" >> [" TERM_ESC TERM_RED "mFAIL" TERM_ESC TERM_RESET "m] " #expr "\n"); \
-	else printf(" >> [" TERM_ESC TERM_GREEN "mPASS" TERM_ESC TERM_RESET "m] " #expr "\n");
+	if(!(expr)) printf(" >> [" TEST_FAIL "] " #expr "\n"); \
+	else printf(" >> [" TEST_PASS "] " #expr "\n");
 
 #define SEQ_ASSERT_STRCMP(expr, str) \
-	if(strcmp((expr).data, str)) printf(" >> [" TERM_ESC TERM_RED "mFAIL" TERM_ESC TERM_RESET \
-		"m] " #expr " == %s\n", str); \
-	else printf(" >> [" TERM_ESC TERM_GREEN "mPASS" TERM_ESC TERM_RESET \
-		"m] " #expr " == %s\n", str);
+	if(strcmp((expr).data, str)) printf(" >> [" TEST_FAIL "] " #expr " == %s\n", str); \
+	else printf(" >> [" TEST_PASS "] " #expr " == %s\n", str);
 
 void test_printf(const char* fmt, ...) {
 	va_list args;
@@ -63,7 +66,7 @@ void test_printf(const char* fmt, ...) {
 
 	va_start(args, fmt);
 
-	sprintf(buffer, " >> [" TERM_ESC TERM_CYAN "mINFO" TERM_ESC TERM_RESET "m] %s\n", fmt);
+	sprintf(buffer, " >> [" TEST_INFO "] %s\n", fmt);
 	vprintf(buffer, args);
 
 	va_end(args);

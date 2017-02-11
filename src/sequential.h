@@ -118,9 +118,8 @@ typedef struct _seq_get_t {
 #define SEQ_ITER_MAX SEQ_INC
 
 #define SEQ_LEVEL 0x66660000
-#define SEQ_TRACE (SEQ_LEVEL | 0x0001)
-#define SEQ_INFO (SEQ_LEVEL | 0x0002)
-#define SEQ_ERROR (SEQ_LEVEL | 0x0003)
+#define SEQ_INFO (SEQ_LEVEL | 0x0001)
+#define SEQ_ERROR (SEQ_LEVEL | 0x0002)
 #define SEQ_LEVEL_MAX SEQ_ERROR
 
 /* The seq_cb_add_t type defines the signature of an optional callback that will be used internally
@@ -219,7 +218,7 @@ SEQ_API seq_bool_t seq_iterate(seq_iter_t iter);
  * ============================================================================================= */
 
 /* Converts the given constant--that is, one of the many SEQ_* defines--and returns its string
- * representation. */
+ * representation, omitting the leading "SEQ_" prefix. */
 SEQ_API const char* seq_opt_str(seq_opt_t opt);
 
 #ifdef __cplusplus
