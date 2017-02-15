@@ -52,7 +52,7 @@ typedef uint32_t seq_opt_t;
  * reverse. */
 typedef int32_t seq_size_t;
 
-typedef va_list seq_args_t;
+typedef va_list* seq_args_t;
 typedef void* seq_data_t;
 
 /* This structure is a special type returned by any of the "getter" routines within the Sequential
@@ -138,10 +138,10 @@ typedef void (*seq_cb_remove_t)(seq_data_t data);
 
 typedef void (*seq_cb_debug_t)(seq_opt_t level, const char* msg, seq_data_t data);
 
-#define seq_arg va_arg
-#define seq_arg_size(args) va_arg(args, seq_size_t)
-#define seq_arg_data(args) va_arg(args, seq_data_t)
-#define seq_arg_opt(args) va_arg(args, seq_opt_t)
+#define seq_arg(args, type) va_arg(*args, type)
+#define seq_arg_size(args) va_arg(*args, seq_size_t)
+#define seq_arg_data(args) va_arg(*args, seq_data_t)
+#define seq_arg_opt(args) va_arg(*args, seq_opt_t)
 
 /* ======================================================================================= Core API
  * seq_create

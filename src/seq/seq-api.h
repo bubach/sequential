@@ -9,8 +9,6 @@
 #define seq_malloc(type) (type)(calloc(1, sizeof(struct _##type)))
 #define seq_opt(opt, mask) (opt <= mask##_MAX && ((opt & mask) == mask))
 #define seq_opt_val(opt) (opt & 0x0000FFFF)
-#define seq_args_start va_start
-#define seq_args_end va_end
 
 typedef void (*seq_impl_create_t)(seq_t seq);
 typedef void (*seq_impl_destroy_t)(seq_t seq);

@@ -2,12 +2,6 @@
 
 #include <string.h>
 
-#define seq_args_wrap(func, start, ret) \
-	seq_args_t args; \
-	seq_args_start(args, start); \
-	ret = seq_##func(start, args); \
-	seq_args_end(args)
-
 /* =================================================================================== Callbacks */
 
 static void seq_cb_remove_free(seq_data_t data) {
@@ -27,6 +21,12 @@ static void seq_cb_debug_fwrite(seq_opt_t level, const char* message, seq_data_t
 }
 
 /* ==================================================================================== Core API */
+
+#define seq_args_wrap(func, start, ret) \
+	va_list args; \
+	va_start(args, start); \
+	ret = seq_##func(start, &args); \
+	va_end(args)
 
 seq_t seq_create(seq_opt_t type) {
 	seq_t seq = NULL;
@@ -310,6 +310,12 @@ const char* seq_opt_str(seq_opt_t opt) {
 
 /* =================================================================================== Debugging */
 
+#define seq_debug_args_wrap(seq, level, fmt) \
+	va_list args; \
+	va_start(args, fmt); \
+	seq_debug(seq, level, fmt, &args); \
+	va_end(args)
+
 static void seq_debug(seq_t seq, seq_opt_t level, const char* fmt, seq_args_t args) {
 	if(
 		seq_opt(seq->set.debug.level, SEQ_LEVEL) &&
@@ -329,18 +335,14 @@ static void seq_debug(seq_t seq, seq_opt_t level, const char* fmt, seq_args_t ar
 			seq->set.debug.postfix
 		);
 
-		vsprintf(result, format, args);
+		vsprintf(result, format, *args);
 
 		seq->set.debug.debug(level, result, seq->set.debug.data);
 	}
 }
 
 seq_bool_t seq_info(seq_t seq, const char* fmt, ...) {
-	seq_args_t args;
-
-	seq_args_start(args, fmt);
-	seq_debug(seq, SEQ_INFO, fmt, args);
-	seq_args_end(args);
+	seq_debug_args_wrap(seq, SEQ_INFO, fmt);
 
 	return SEQ_TRUE;
 }
@@ -352,11 +354,7 @@ seq_bool_t seq_vinfo(seq_t seq, const char* fmt, seq_args_t args) {
 }
 
 seq_bool_t seq_error(seq_t seq, const char* fmt, ...) {
-	seq_args_t args;
-
-	seq_args_start(args, fmt);
-	seq_debug(seq, SEQ_ERROR, fmt, args);
-	seq_args_end(args);
+	seq_debug_args_wrap(seq, SEQ_ERROR, fmt);
 
 	return SEQ_FALSE;
 }
