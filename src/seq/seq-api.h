@@ -49,16 +49,17 @@ struct _seq_t {
 	struct {
 		seq_cb_add_t add;
 		seq_cb_remove_t remove;
+		seq_cb_compare_t compare;
+		seq_cb_debug_t debug;
+	} cb;
 
-		struct {
-			seq_cb_debug_t debug;
-			seq_data_t data;
-			seq_opt_t level;
+	struct {
+		seq_data_t data;
+		seq_opt_t level;
 
-			const char* prefix;
-			const char* postfix;
-		} debug;
-	} set;
+		const char* prefix;
+		const char* postfix;
+	} debug;
 
 	seq_impl_t impl;
 	seq_data_t data;

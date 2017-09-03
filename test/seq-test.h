@@ -43,9 +43,9 @@ void test_##name(const char* descr) { \
 	seq_set(seq, SEQ_DEBUG_STDOUT); \
 	seq_set(seq, SEQ_DEBUG_LEVEL, SEQ_INFO); \
 	seq_set(seq, SEQ_DEBUG_PREFIX, " ** [" TEST_DBUG "] "); \
-	printf("============================================================\n"); \
+	printf("======================================================================\n"); \
 	printf("test_%s: %s\n", #name, descr); \
-	printf("============================================================\n"); { \
+	printf("======================================================================\n"); { \
 
 #define SEQ_TEST_END } \
 	seq_destroy(seq); \
@@ -60,7 +60,7 @@ void test_##name(const char* descr) { \
 	if(strcmp((expr).data, str)) printf(" >> [" TEST_FAIL "] " #expr " == %s\n", str); \
 	else printf(" >> [" TEST_PASS "] " #expr " == %s\n", str);
 
-void test_printf(const char* fmt, ...) {
+void test_info(const char* fmt, ...) {
 	va_list args;
 	char buffer[1024];
 

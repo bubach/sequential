@@ -36,9 +36,9 @@ seq_t seq_create(seq_opt_t type) {
 
 		if(!seq) return NULL;
 
-		seq->set.debug.prefix = "";
-		seq->set.debug.postfix = "";
-		seq->set.debug.level = SEQ_ERROR;
+		seq->debug.prefix = "";
+		seq->debug.postfix = "";
+		seq->debug.level = SEQ_ERROR;
 
 		seq_impl_list()->create(seq);
 	}
@@ -118,7 +118,7 @@ seq_bool_t seq_vset(seq_t seq, seq_args_t args) {
 
 		if(!add) return seq_error(seq, "invalid SEQ_CB_ADD callback");
 
-		seq->set.add = add;
+		seq->cb.add = add;
 	}
 
 	else if(set == SEQ_CB_REMOVE) {
@@ -126,28 +126,28 @@ seq_bool_t seq_vset(seq_t seq, seq_args_t args) {
 
 		if(!remove) return seq_error(seq, "invalid SEQ_CB_REMOVE callback");
 
-		seq->set.remove = remove;
+		seq->cb.remove = remove;
 	}
 
 	else if(set == SEQ_CB_DEBUG) {
-		seq->set.debug.debug = seq_arg(args, seq_cb_debug_t);
-		seq->set.debug.data = seq_arg(args, FILE*);
+		seq->cb.debug = seq_arg(args, seq_cb_debug_t);
+		seq->debug.data = seq_arg(args, FILE*);
 	}
 
-	else if(set == SEQ_CB_REMOVE_FREE) seq->set.remove = seq_cb_remove_free;
+	else if(set == SEQ_CB_REMOVE_FREE) seq->cb.remove = seq_cb_remove_free;
 
-	else if(set == SEQ_DEBUG_STDOUT) seq->set.debug.debug = seq_cb_debug_stdout;
+	else if(set == SEQ_DEBUG_STDOUT) seq->cb.debug = seq_cb_debug_stdout;
 
-	else if(set == SEQ_DEBUG_STDERR) seq->set.debug.debug = seq_cb_debug_stderr;
+	else if(set == SEQ_DEBUG_STDERR) seq->cb.debug = seq_cb_debug_stderr;
 
 	else if(set == SEQ_DEBUG_FWRITE) {
-		seq->set.debug.debug = seq_cb_debug_fwrite;
-		seq->set.debug.data = seq_arg(args, FILE*);
+		seq->cb.debug = seq_cb_debug_fwrite;
+		seq->debug.data = seq_arg(args, FILE*);
 	}
 
-	else if(set == SEQ_DEBUG_PREFIX) seq->set.debug.prefix = seq_arg(args, const char*);
+	else if(set == SEQ_DEBUG_PREFIX) seq->debug.prefix = seq_arg(args, const char*);
 
-	else if(set == SEQ_DEBUG_POSTFIX) seq->set.debug.postfix = seq_arg(args, const char*);
+	else if(set == SEQ_DEBUG_POSTFIX) seq->debug.postfix = seq_arg(args, const char*);
 
 	else return seq->impl->set(seq, set, args);
 
@@ -222,7 +222,7 @@ seq_bool_t seq_iterate(seq_iter_t iter) {
 
 /* =========================================================================== Miscellaneous API */
 
-static const char* seq_opt_str_type[] = {
+static const char* seq_string_type[] = {
 	"TYPE",
 	"LIST",
 	"MAP",
@@ -232,7 +232,7 @@ static const char* seq_opt_str_type[] = {
 	"ARRAY"
 };
 
-static const char* seq_opt_str_add[] = {
+static const char* seq_string_add[] = {
 	"ADD",
 	"APPEND",
 	"PREPEND",
@@ -244,7 +244,7 @@ static const char* seq_opt_str_add[] = {
 	"PUSH"
 };
 
-static const char* seq_opt_str_get[] = {
+static const char* seq_string_get[] = {
 	"GET",
 	"INDEX",
 	"KEY",
@@ -253,7 +253,7 @@ static const char* seq_opt_str_get[] = {
 	"DATA"
 };
 
-static const char* seq_opt_str_set[] = {
+static const char* seq_string_set[] = {
 	"SET",
 	"CB_ADD",
 	"CB_REMOVE",
@@ -267,7 +267,7 @@ static const char* seq_opt_str_set[] = {
 	"DEBUG_LEVEL"
 };
 
-static const char* seq_opt_str_iter[] = {
+static const char* seq_string_iter[] = {
 	"ITER",
 	"READY",
 	"ACTIVE",
@@ -276,22 +276,29 @@ static const char* seq_opt_str_iter[] = {
 	"INC"
 };
 
-static const char* seq_opt_str_level[] = {
+static const char* seq_string_compare[] = {
+	"LESS",
+	"EQUAL",
+	"GREATER"
+};
+
+static const char* seq_string_level[] = {
 	"LEVEL",
 	"INFO",
 	"ERROR"
 };
 
-static const char** seq_opt_str_data[] = {
-	seq_opt_str_type,
-	seq_opt_str_add,
-	seq_opt_str_get,
-	seq_opt_str_set,
-	seq_opt_str_iter,
-	seq_opt_str_level
+static const char** seq_string_data[] = {
+	seq_string_type,
+	seq_string_add,
+	seq_string_get,
+	seq_string_set,
+	seq_string_iter,
+	seq_string_compare,
+	seq_string_level
 };
 
-const char* seq_opt_str(seq_opt_t opt) {
+const char* seq_string(seq_opt_t opt) {
 	if(opt == SEQ_FALSE) return "FALSE";
 
 	else if(opt == SEQ_TRUE) return "TRUE";
@@ -302,10 +309,19 @@ const char* seq_opt_str(seq_opt_t opt) {
 		seq_opt(opt, SEQ_GET) ||
 		seq_opt(opt, SEQ_SET) ||
 		seq_opt(opt, SEQ_ITER) ||
+		seq_opt(opt, SEQ_COMPARE) ||
 		seq_opt(opt, SEQ_LEVEL)
-	) return seq_opt_str_data[((opt & 0x000F0000) >> 16) - 1][seq_opt_val(opt)];
+	) return seq_string_data[((opt & 0x000F0000) >> 16) - 1][seq_opt_val(opt)];
 
 	else return "NULL";
+}
+
+seq_size_t seq_save(seq_t seq) {
+	return 0;
+}
+
+seq_size_t seq_restore(seq_t seq) {
+	return 0;
 }
 
 /* =================================================================================== Debugging */
@@ -318,26 +334,17 @@ const char* seq_opt_str(seq_opt_t opt) {
 
 static void seq_debug(seq_t seq, seq_opt_t level, const char* fmt, seq_args_t args) {
 	if(
-		seq_opt(seq->set.debug.level, SEQ_LEVEL) &&
-		seq->set.debug.debug != NULL &&
-		seq_opt_val(level) <= seq_opt_val(seq->set.debug.level)
+		seq_opt(seq->debug.level, SEQ_LEVEL) &&
+		seq->cb.debug != NULL &&
+		seq_opt_val(level) <= seq_opt_val(seq->debug.level)
 	) {
 		char format[512];
 		char result[1024];
-		seq_size_t index = 0;
 
-		sprintf(
-			format + index,
-			"%s[%s] %s%s\n",
-			seq->set.debug.prefix,
-			seq_opt_str(level),
-			fmt,
-			seq->set.debug.postfix
-		);
+		snprintf(format, 512, "%s%s%s\n", seq->debug.prefix, fmt, seq->debug.postfix);
+		vsnprintf(result, 1024, format, *args);
 
-		vsprintf(result, format, *args);
-
-		seq->set.debug.debug(level, result, seq->set.debug.data);
+		seq->cb.debug(level, result, seq->debug.data);
 	}
 }
 

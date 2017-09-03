@@ -8,6 +8,7 @@ SET(SEQUENTIAL_STATIC TRUE CACHE BOOL "Enable static build of Sequential.")
 SET(SEQUENTIAL_SOURCE_FILES
 	"src/seq/seq-api.c"
 	"src/seq/seq-list.c"
+	# "src/seq/seq-map.c"
 )
 
 SET(SEQUENTIAL_HEADER_FILES

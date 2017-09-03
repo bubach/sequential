@@ -26,12 +26,12 @@ static test_t* test_create(int i, float f, double d, const char* s) {
 }
 
 /* static void test_info(test_t* t) {
-	test_printf("test_t (%p) {", t);
-	test_printf("  i = %d", t->i);
-	test_printf("  f = %f", t->f);
-	test_printf("  d = %f", t->d);
-	test_printf("  s = %s", t->s);
-	test_printf("}");
+	test_info("test_t (%p) {", t);
+	test_info("  i = %d", t->i);
+	test_info("  f = %f", t->f);
+	test_info("  d = %f", t->d);
+	test_info("  s = %s", t->s);
+	test_info("}");
 } */
 
 const seq_size_t test_strings_size = 12;
@@ -47,6 +47,12 @@ void test_strings_append(seq_t seq) {
 	seq_size_t i;
 
 	for(i = 0; i < test_strings_size; i++) seq_add(seq, SEQ_APPEND, test_strings[i]);
+}
+
+void test_strings_info(seq_t seq) {
+	seq_size_t i;
+
+	for(i = 0; i < seq_size(seq); i++) test_info("[%02d] = %s", i, seq_get(seq, SEQ_INDEX, i));
 }
 
 SEQ_TEST_BEGIN(add_append_prepend)
@@ -92,7 +98,7 @@ SEQ_TEST_BEGIN(add_after)
 	SEQ_ASSERT( seq_size(seq) == 6 )
 	SEQ_ASSERT_STRCMP( seq_get(seq, SEQ_INDEX, 1), "foo" )
 	SEQ_ASSERT_STRCMP( seq_get(seq, SEQ_INDEX, 3), "bar" )
-	SEQ_ASSERT_STRCMP( seq_get(seq, SEQ_INDEX, 4), "baz" )
+	SEQ_ASSERT_STRCMP( seq_get(seq, SEQ_INDEX, 5), "baz" )
 SEQ_TEST_END
 
 SEQ_TEST_BEGIN(add_replace)
@@ -128,7 +134,7 @@ seq_data_t on_add(seq_args_t args) {
 void on_remove(seq_data_t data) {
 	unsigned long d = (unsigned long)(data);
 
-	test_printf("on_remove(%lu, %lu, %lu)", (d >> 24) & 0xFF, (d >> 16) & 0xFF, d & 0xFF);
+	test_info("on_remove(%lu, %lu, %lu)", (d >> 24) & 0xFF, (d >> 16) & 0xFF, d & 0xFF);
 }
 
 SEQ_TEST_BEGIN(on_add_remove)
@@ -163,12 +169,16 @@ SEQ_TEST_END
 
 SEQ_TEST_BEGIN(add_errors)
 	SEQ_ASSERT( seq_add(seq, SEQ_APPEND, "foo") )
+
+	/* Pass something other than a SEQ_ADD constant. */
+	SEQ_ASSERT( !seq_add(seq, SEQ_GET, "bar") )
 	SEQ_ASSERT( !seq_add(seq, "bar") )
-	SEQ_ASSERT( !seq_add(seq, SEQ_APPEND, NULL) )
-	/* SEQ_ASSERT( !seq_add(seq, SEQ_SEND, "baz") )
-	SEQ_ASSERT( !seq_add(seq, SEQ_ADD, "qux") ) */
+
+	/* SEQ_ASSERT( !seq_add(seq, SEQ_APPEND, NULL) )
+	SEQ_ASSERT( !seq_add(seq, SEQ_SEND, "baz") )
+	SEQ_ASSERT( !seq_add(seq, SEQ_ADD, "qux") )
 	SEQ_ASSERT( !seq_remove(seq, SEQ_INDEX, 1) )
-	SEQ_ASSERT( !seq_remove(seq, SEQ_INDEX, -3) )
+	SEQ_ASSERT( !seq_remove(seq, SEQ_INDEX, -3) ) */
 SEQ_TEST_END
 
 SEQ_TEST_BEGIN(iterate)
@@ -180,7 +190,7 @@ SEQ_TEST_BEGIN(iterate)
 		while(seq_iterate(i)) {
 			seq_get_t get = seq_iter_get(i, SEQ_DATA);
 
-			test_printf(
+			test_info(
 				"index=%d data=%s test_strings[%d]=%s",
 				get.handle.index,
 				get.data,
@@ -238,12 +248,10 @@ int main(int argc, char** argv) {
 		int t;
 
 		printf(
-			"Specify one or more test names to run, separated by\n"
-			"spaces. Using substrings is permitted, as well as the\n"
-			"special keyword 'all' (which runs every test).\n"
-			"Alternatively, you can use the numeric index indicated\n"
-			"in the list below.\n"
-			"\n"
+			"Specify one or more test names to run, separated by spaces. Using\n"
+			"substrings is permitted, as well as the special keyword 'all' (which\n"
+			"runs every test). Alternatively, you can use the numeric index\n"
+			"indicated in the list below.\n\n"
 			"Available tests are:\n\n"
 		);
 

@@ -62,7 +62,7 @@ static seq_size_t seq_list_index(seq_t seq, seq_size_t index) {
 }
 
 static void seq_list_node_destroy(seq_t seq, seq_list_node_t node) {
-	if(seq->set.remove) seq->set.remove(node->data);
+	if(seq->cb.remove) seq->cb.remove(node->data);
 
 	free(node);
 }
@@ -107,9 +107,9 @@ static seq_list_node_get_t seq_list_node_get(seq_t seq, seq_args_t args) {
 }
 
 static seq_data_t seq_list_node_data(seq_t seq, seq_args_t args) {
-	if(!seq->set.add) return seq_arg_data(args);
+	if(!seq->cb.add) return seq_arg_data(args);
 
-	else return seq->set.add(args);
+	else return seq->cb.add(args);
 }
 
 /* ======================================================================== SEQ_LIST Implementation
