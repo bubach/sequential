@@ -50,16 +50,15 @@ struct _seq_t {
 		seq_cb_add_t add;
 		seq_cb_remove_t remove;
 		seq_cb_compare_t compare;
-		seq_cb_debug_t debug;
+		seq_cb_error_t error;
 	} cb;
 
 	struct {
 		seq_data_t data;
-		seq_opt_t level;
 
 		const char* prefix;
 		const char* postfix;
-	} debug;
+	} error;
 
 	seq_impl_t impl;
 	seq_data_t data;
@@ -74,11 +73,9 @@ struct _seq_iter_t {
 
 seq_impl_t seq_impl_list();
 
-seq_bool_t seq_info(seq_t seq, const char* fmt, ...);
-seq_bool_t seq_vinfo(seq_t seq, const char* fmt, seq_args_t args);
-
-seq_bool_t seq_error(seq_t seq, const char* fmt, ...);
-seq_bool_t seq_verror(seq_t seq, const char* fmt, seq_args_t args);
+void seq_error(seq_t seq, const char* fmt, ...);
+seq_bool_t seq_false(seq_t seq, const char* fmt, ...);
+seq_data_t seq_null(seq_t seq, const char* fmt, ...);
 
 seq_get_t seq_got_index(seq_data_t data, seq_size_t index);
 seq_get_t seq_got_key(seq_data_t data, seq_data_t key);
@@ -116,4 +113,3 @@ seq_get_t seq_got_null();
 	}
 
 #endif
-

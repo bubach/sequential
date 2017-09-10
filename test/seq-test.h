@@ -40,9 +40,8 @@
 #define SEQ_TEST_BEGIN(name) \
 void test_##name(const char* descr) { \
 	seq_t seq = seq_create(SEQ_LIST); \
-	seq_set(seq, SEQ_DEBUG_STDOUT); \
-	seq_set(seq, SEQ_DEBUG_LEVEL, SEQ_INFO); \
-	seq_set(seq, SEQ_DEBUG_PREFIX, " ** [" TEST_DBUG "] "); \
+	seq_set(seq, SEQ_ERROR_STDOUT); \
+	seq_set(seq, SEQ_ERROR_PREFIX, " ** [" TEST_DBUG "] "); \
 	printf("======================================================================\n"); \
 	printf("test_%s: %s\n", #name, descr); \
 	printf("======================================================================\n"); { \
@@ -73,4 +72,3 @@ void test_info(const char* fmt, ...) {
 }
 
 #endif
-

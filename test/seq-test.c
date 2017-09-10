@@ -124,15 +124,15 @@ SEQ_TEST_BEGIN(remove_free)
 SEQ_TEST_END
 
 seq_data_t on_add(seq_args_t args) {
-	unsigned long foo = seq_arg(args, unsigned long);
-	unsigned long bar = seq_arg(args, unsigned long);
-	unsigned long baz = seq_arg(args, unsigned long);
+	uint64_t foo = seq_arg(args, uint64_t);
+	uint64_t bar = seq_arg(args, uint64_t);
+	uint64_t baz = seq_arg(args, uint64_t);
 
 	return (seq_data_t)((foo << 24) | (bar << 16) | baz);
 }
 
 void on_remove(seq_data_t data) {
-	unsigned long d = (unsigned long)(data);
+	uint64_t d = (uint64_t)(data);
 
 	test_info("on_remove(%lu, %lu, %lu)", (d >> 24) & 0xFF, (d >> 16) & 0xFF, d & 0xFF);
 }
@@ -281,4 +281,3 @@ int main(int argc, char** argv) {
 
 	return 0;
 }
-

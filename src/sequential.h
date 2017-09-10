@@ -26,7 +26,7 @@ extern "C" {
  * seq_get_t
  * seq_cb_add_t
  * seq_cb_remove_t
- * seq_cb_debug_t
+ * seq_cb_error_t
  * ============================================================================================= */
 
 #define SEQ_VERSION_MAJOR 0
@@ -100,14 +100,13 @@ typedef struct _seq_get_t {
 #define SEQ_CB_ADD (SEQ_SET | 0x0001)
 #define SEQ_CB_REMOVE (SEQ_SET | 0x0002)
 #define SEQ_CB_REMOVE_FREE (SEQ_SET | 0x0003)
-#define SEQ_CB_DEBUG (SEQ_SET | 0x0004)
-#define SEQ_DEBUG_STDOUT (SEQ_SET | 0x0005)
-#define SEQ_DEBUG_STDERR (SEQ_SET | 0x0006)
-#define SEQ_DEBUG_FWRITE (SEQ_SET | 0x0007)
-#define SEQ_DEBUG_PREFIX (SEQ_SET | 0x0008)
-#define SEQ_DEBUG_POSTFIX (SEQ_SET | 0x0009)
-#define SEQ_DEBUG_LEVEL (SEQ_SET | 0x000A)
-#define SEQ_SET_MAX SEQ_DEBUG_LEVEL
+#define SEQ_CB_ERROR (SEQ_SET | 0x0004)
+#define SEQ_ERROR_STDOUT (SEQ_SET | 0x0005)
+#define SEQ_ERROR_STDERR (SEQ_SET | 0x0006)
+#define SEQ_ERROR_FWRITE (SEQ_SET | 0x0007)
+#define SEQ_ERROR_PREFIX (SEQ_SET | 0x0008)
+#define SEQ_ERROR_POSTFIX (SEQ_SET | 0x0009)
+#define SEQ_SET_MAX SEQ_ERROR_POSTFIX
 
 #define SEQ_ITER 0x55550000
 #define SEQ_READY (SEQ_ITER | 0x0001)
@@ -122,11 +121,6 @@ typedef struct _seq_get_t {
 #define SEQ_EQUAL (SEQ_COMPARE | 0x0002)
 #define SEQ_GREATER (SEQ_COMPARE | 0x0003)
 #define SEQ_COMPARE_MAX SEQ_GREATER
-
-#define SEQ_LEVEL 0xFFFF0000
-#define SEQ_INFO (SEQ_LEVEL | 0x0001)
-#define SEQ_ERROR (SEQ_LEVEL | 0x0002)
-#define SEQ_LEVEL_MAX SEQ_ERROR
 
 /* The seq_cb_add_t type defines the signature of an optional callback that will be used internally
  * by the seq_t instance when seq_add() is called. It is passed the remainder of the argument list
@@ -145,7 +139,7 @@ typedef void (*seq_cb_remove_t)(seq_data_t data);
 /* Returns one of the SEQ_COMPARE values. */
 typedef seq_opt_t (*seq_cb_compare_t)(seq_t seq, seq_data_t lhs, seq_data_t rhs);
 
-typedef void (*seq_cb_debug_t)(seq_opt_t level, const char* msg, seq_data_t data);
+typedef void (*seq_cb_error_t)(const char* msg, seq_data_t data);
 
 #define seq_arg(args, type) va_arg(*args, type)
 #define seq_arg_size(args) va_arg(*args, seq_size_t)
@@ -230,22 +224,8 @@ SEQ_API seq_bool_t seq_iterate(seq_iter_t iter);
  * representation, omitting the leading "SEQ_" prefix. */
 SEQ_API const char* seq_string(seq_opt_t opt);
 
-SEQ_API seq_size_t seq_save(seq_t seq);
-SEQ_API seq_size_t seq_restore(seq_t seq);
-
-#if 0
-seq_t seq_list_create();
-void seq_list_destroy(seq_t list);
-seq_bool_t seq_list_append(seq_t list, ...);
-seq_bool_t seq_list_prepend(seq_t list, ...);
-seq_bool_t seq_list_before(seq_t list, seq_size_t index, ...);
-seq_bool_t seq_list_after(seq_t list, seq_size_t index, ...);
-seq_bool_t seq_list_replace(seq_t list, seq_size_t index, ...);
-#endif
-
 #ifdef __cplusplus
 }
 #endif
 
 #endif
-

@@ -107,9 +107,15 @@ static seq_list_node_get_t seq_list_node_get(seq_t seq, seq_args_t args) {
 }
 
 static seq_data_t seq_list_node_data(seq_t seq, seq_args_t args) {
-	if(!seq->cb.add) return seq_arg_data(args);
+	seq_data_t data = NULL;
 
-	else return seq->cb.add(args);
+	if(!seq->cb.add) data = seq_arg_data(args);
+
+	else data = seq->cb.add(args);
+
+	if(!data) seq_error(seq, "seq_list_add: invalid node data");
+
+	return data;
 }
 
 /* ======================================================================== SEQ_LIST Implementation
@@ -147,7 +153,7 @@ static seq_bool_t seq_list_add(seq_t seq, seq_args_t args) {
 	seq_list_node_t node = NULL;
 	seq_opt_t add = seq_arg_opt(args);
 
-	if(!seq_opt(add, SEQ_ADD) || !(node = seq_malloc(seq_list_node_t))) goto err;
+	if(!(node = seq_malloc(seq_list_node_t))) return seq_false(seq, "seq_list_add: malloc failed");
 
 	if(add == SEQ_APPEND || add == SEQ_PREPEND) {
 		if(!(node->data = seq_list_node_data(seq, args))) goto err;
@@ -178,7 +184,13 @@ static seq_bool_t seq_list_add(seq_t seq, seq_args_t args) {
 	else if(add == SEQ_BEFORE || add == SEQ_AFTER || add == SEQ_REPLACE) {
 		seq_list_node_t pnode = seq_list_node_get(seq, args).node;
 
-		if(!pnode || !(node->data = seq_list_node_data(seq, args))) goto err;
+		if(!pnode) {
+			seq_error(seq, "seq_list_add: invalid previous node");
+
+			goto err;
+		}
+
+		if(!(node->data = seq_list_node_data(seq, args))) goto err;
 
 		if(add == SEQ_BEFORE) {
 			node->next = pnode;
@@ -216,15 +228,24 @@ static seq_bool_t seq_list_add(seq_t seq, seq_args_t args) {
 
 			seq_list_node_destroy(seq, pnode);
 
-			/* TODO: This is a silly hack... */
+			/* TODO: This is a silly hack, since we know the top-level seq_add() will increment
+			the size for us (by design). In the case of SEQ_REPLACE however, we do not want
+			this. Fixing this will require having the implementation-specific functions return
+			something more complex than they currently do. */
 			seq->size--;
 		}
+	}
+
+	else {
+		seq_error(seq, "seq_list_add: invalid SEQ_ADD [0x%08X]", add);
+
+		goto err;
 	}
 
 	return SEQ_TRUE;
 
 err:
-	if(node) seq_list_node_destroy(seq, node);
+	seq_list_node_destroy(seq, node);
 
 	return SEQ_FALSE;
 }
@@ -353,4 +374,3 @@ static seq_bool_t seq_list_iter_iterate(seq_iter_t iter) {
 
 	return SEQ_TRUE;
 }
-

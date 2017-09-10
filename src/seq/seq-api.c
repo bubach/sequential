@@ -8,15 +8,15 @@ static void seq_cb_remove_free(seq_data_t data) {
 	free(data);
 }
 
-static void seq_cb_debug_stdout(seq_opt_t level, const char* message, seq_data_t data) {
+static void seq_cb_error_stdout(const char* message, seq_data_t data) {
 	fprintf(stdout, message);
 }
 
-static void seq_cb_debug_stderr(seq_opt_t level, const char* message, seq_data_t data) {
+static void seq_cb_error_stderr(const char* message, seq_data_t data) {
 	fprintf(stderr, message);
 }
 
-static void seq_cb_debug_fwrite(seq_opt_t level, const char* message, seq_data_t data) {
+static void seq_cb_error_fwrite(const char* message, seq_data_t data) {
 	fprintf((FILE*)(data), message);
 }
 
@@ -31,16 +31,15 @@ static void seq_cb_debug_fwrite(seq_opt_t level, const char* message, seq_data_t
 seq_t seq_create(seq_opt_t type) {
 	seq_t seq = NULL;
 
-	if(seq_opt(type, SEQ_TYPE) && type == SEQ_LIST) {
+	if(seq_opt(type, SEQ_TYPE)) {
 		seq = seq_malloc(seq_t);
 
-		if(!seq) return NULL;
+		if(seq) {
+			seq->error.prefix = "";
+			seq->error.postfix = "";
 
-		seq->debug.prefix = "";
-		seq->debug.postfix = "";
-		seq->debug.level = SEQ_ERROR;
-
-		seq_impl_list()->create(seq);
+			if(type == SEQ_LIST) seq_impl_list()->create(seq);
+		}
 	}
 
 	return seq;
@@ -67,7 +66,7 @@ seq_bool_t seq_vadd(seq_t seq, seq_args_t args) {
 		return SEQ_TRUE;
 	}
 
-	return seq_error(seq, "impl->add() callback failed");
+	return seq_false(seq, "seq_add: failed");
 }
 
 seq_bool_t seq_remove(seq_t seq, ...) {
@@ -85,7 +84,7 @@ seq_bool_t seq_vremove(seq_t seq, seq_args_t args) {
 		return SEQ_TRUE;
 	}
 
-	return seq_error(seq, "impl->remove() callback failed");
+	return seq_false(seq, "seq_remove: failed");
 }
 
 seq_get_t seq_get(seq_t seq, ...) {
@@ -111,12 +110,12 @@ seq_bool_t seq_set(seq_t seq, ...) {
 seq_bool_t seq_vset(seq_t seq, seq_args_t args) {
 	seq_opt_t set = seq_arg_opt(args);
 
-	if(!seq_opt(set, SEQ_SET)) return seq_error(seq, "invalid SEQ_SET value");
+	if(!seq_opt(set, SEQ_SET)) return seq_false(seq, "seq_set: invalid SEQ_SET [%X]", set);
 
 	if(set == SEQ_CB_ADD) {
 		seq_cb_add_t add = seq_arg(args, seq_cb_add_t);
 
-		if(!add) return seq_error(seq, "invalid SEQ_CB_ADD callback");
+		if(!add) return seq_false(seq, "seq_set: invalid SEQ_CB_ADD");
 
 		seq->cb.add = add;
 	}
@@ -124,30 +123,27 @@ seq_bool_t seq_vset(seq_t seq, seq_args_t args) {
 	else if(set == SEQ_CB_REMOVE) {
 		seq_cb_remove_t remove = seq_arg(args, seq_cb_remove_t);
 
-		if(!remove) return seq_error(seq, "invalid SEQ_CB_REMOVE callback");
+		if(!remove) return seq_false(seq, "seq_set: invalid SEQ_CB_REMOVE");
 
 		seq->cb.remove = remove;
 	}
 
-	else if(set == SEQ_CB_DEBUG) {
-		seq->cb.debug = seq_arg(args, seq_cb_debug_t);
-		seq->debug.data = seq_arg(args, FILE*);
-	}
-
 	else if(set == SEQ_CB_REMOVE_FREE) seq->cb.remove = seq_cb_remove_free;
 
-	else if(set == SEQ_DEBUG_STDOUT) seq->cb.debug = seq_cb_debug_stdout;
+	else if(set == SEQ_CB_ERROR) seq->cb.error = seq_arg(args, seq_cb_error_t);
 
-	else if(set == SEQ_DEBUG_STDERR) seq->cb.debug = seq_cb_debug_stderr;
+	else if(set == SEQ_ERROR_STDOUT) seq->cb.error = seq_cb_error_stdout;
 
-	else if(set == SEQ_DEBUG_FWRITE) {
-		seq->cb.debug = seq_cb_debug_fwrite;
-		seq->debug.data = seq_arg(args, FILE*);
+	else if(set == SEQ_ERROR_STDERR) seq->cb.error = seq_cb_error_stderr;
+
+	else if(set == SEQ_ERROR_FWRITE) {
+		seq->cb.error = seq_cb_error_fwrite;
+		seq->error.data = seq_arg(args, FILE*);
 	}
 
-	else if(set == SEQ_DEBUG_PREFIX) seq->debug.prefix = seq_arg(args, const char*);
+	else if(set == SEQ_ERROR_PREFIX) seq->error.prefix = seq_arg(args, const char*);
 
-	else if(set == SEQ_DEBUG_POSTFIX) seq->debug.postfix = seq_arg(args, const char*);
+	else if(set == SEQ_ERROR_POSTFIX) seq->error.postfix = seq_arg(args, const char*);
 
 	else return seq->impl->set(seq, set, args);
 
@@ -258,13 +254,12 @@ static const char* seq_string_set[] = {
 	"CB_ADD",
 	"CB_REMOVE",
 	"CB_REMOVE_FREE",
-	"CB_DEBUG",
-	"DEBUG_STDOUT",
-	"DEBUG_STDERR",
-	"DEBUG_FWRITE",
-	"DEBUG_PREFIX",
-	"DEBUG_POSTFIX",
-	"DEBUG_LEVEL"
+	"CB_ERROR",
+	"ERROR_STDOUT",
+	"ERROR_STDERR",
+	"ERROR_FWRITE",
+	"ERROR_PREFIX",
+	"ERROR_POSTFIX"
 };
 
 static const char* seq_string_iter[] = {
@@ -282,20 +277,13 @@ static const char* seq_string_compare[] = {
 	"GREATER"
 };
 
-static const char* seq_string_level[] = {
-	"LEVEL",
-	"INFO",
-	"ERROR"
-};
-
 static const char** seq_string_data[] = {
 	seq_string_type,
 	seq_string_add,
 	seq_string_get,
 	seq_string_set,
 	seq_string_iter,
-	seq_string_compare,
-	seq_string_level
+	seq_string_compare
 };
 
 const char* seq_string(seq_opt_t opt) {
@@ -309,67 +297,46 @@ const char* seq_string(seq_opt_t opt) {
 		seq_opt(opt, SEQ_GET) ||
 		seq_opt(opt, SEQ_SET) ||
 		seq_opt(opt, SEQ_ITER) ||
-		seq_opt(opt, SEQ_COMPARE) ||
-		seq_opt(opt, SEQ_LEVEL)
+		seq_opt(opt, SEQ_COMPARE)
 	) return seq_string_data[((opt & 0x000F0000) >> 16) - 1][seq_opt_val(opt)];
 
 	else return "NULL";
 }
 
-seq_size_t seq_save(seq_t seq) {
-	return 0;
-}
-
-seq_size_t seq_restore(seq_t seq) {
-	return 0;
-}
-
 /* =================================================================================== Debugging */
 
-#define seq_debug_args_wrap(seq, level, fmt) \
+#define seq_error_args_wrap(start) \
 	va_list args; \
-	va_start(args, fmt); \
-	seq_debug(seq, level, fmt, &args); \
+	va_start(args, start); \
+	seq_verror(seq, start, &args); \
 	va_end(args)
 
-static void seq_debug(seq_t seq, seq_opt_t level, const char* fmt, seq_args_t args) {
-	if(
-		seq_opt(seq->debug.level, SEQ_LEVEL) &&
-		seq->cb.debug != NULL &&
-		seq_opt_val(level) <= seq_opt_val(seq->debug.level)
-	) {
+static void seq_verror(seq_t seq, const char* fmt, seq_args_t args) {
+	if(seq->cb.error) {
 		char format[512];
 		char result[1024];
 
-		snprintf(format, 512, "%s%s%s\n", seq->debug.prefix, fmt, seq->debug.postfix);
+		snprintf(format, 512, "%s%s%s\n", seq->error.prefix, fmt, seq->error.postfix);
 		vsnprintf(result, 1024, format, *args);
 
-		seq->cb.debug(level, result, seq->debug.data);
+		seq->cb.error(result, seq->error.data);
 	}
 }
 
-seq_bool_t seq_info(seq_t seq, const char* fmt, ...) {
-	seq_debug_args_wrap(seq, SEQ_INFO, fmt);
-
-	return SEQ_TRUE;
+void seq_error(seq_t seq, const char* fmt, ...) {
+	seq_error_args_wrap(fmt);
 }
 
-seq_bool_t seq_vinfo(seq_t seq, const char* fmt, seq_args_t args) {
-	seq_debug(seq, SEQ_INFO, fmt, args);
-
-	return SEQ_TRUE;
-}
-
-seq_bool_t seq_error(seq_t seq, const char* fmt, ...) {
-	seq_debug_args_wrap(seq, SEQ_ERROR, fmt);
+seq_bool_t seq_false(seq_t seq, const char* fmt, ...) {
+	seq_error_args_wrap(fmt);
 
 	return SEQ_FALSE;
 }
 
-seq_bool_t seq_verror(seq_t seq, const char* fmt, seq_args_t args) {
-	seq_debug(seq, SEQ_ERROR, fmt, args);
+seq_data_t seq_null(seq_t seq, const char* fmt, ...) {
+	seq_error_args_wrap(fmt);
 
-	return SEQ_FALSE;
+	return NULL;
 }
 
 /* ============================================================================= SEQ_GET Helpers */
@@ -397,4 +364,3 @@ seq_get_t seq_got_key(seq_data_t data, seq_data_t key) {
 seq_get_t seq_got_null() {
 	return seq_got(NULL, NULL, 0);
 }
-
