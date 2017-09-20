@@ -2,24 +2,6 @@
 
 #include <string.h>
 
-/* =================================================================================== Callbacks */
-
-static void seq_cb_remove_free(seq_data_t data) {
-	free(data);
-}
-
-static void seq_cb_error_stdout(const char* message, seq_data_t data) {
-	fprintf(stdout, message);
-}
-
-static void seq_cb_error_stderr(const char* message, seq_data_t data) {
-	fprintf(stderr, message);
-}
-
-static void seq_cb_error_fwrite(const char* message, seq_data_t data) {
-	fprintf((FILE*)(data), message);
-}
-
 /* ==================================================================================== Core API */
 
 #define seq_args_wrap(func, start, ret) \
@@ -35,9 +17,6 @@ seq_t seq_create(seq_opt_t type) {
 		seq = seq_malloc(seq_t);
 
 		if(seq) {
-			seq->error.prefix = "";
-			seq->error.postfix = "";
-
 			if(type == SEQ_LIST) seq_impl_list()->create(seq);
 		}
 	}
@@ -51,40 +30,73 @@ void seq_destroy(seq_t seq) {
 	free(seq);
 }
 
-seq_bool_t seq_add(seq_t seq, ...) {
-	seq_bool_t r = SEQ_FALSE;
+seq_opt_t seq_config(seq_t seq, ...) {
+	seq_opt_t r;
+
+	seq_args_wrap(vconfig, seq, r);
+
+	return r;
+}
+
+seq_opt_t seq_vconfig(seq_t seq, seq_args_t args) {
+	seq_opt_t opt = seq_arg_opt(args);
+
+	if(seq_opt(opt, SEQ_CONFIG)) {
+		if(opt == SEQ_CB_ADD) {
+			seq_cb_add_t add = seq_arg(args, seq_cb_add_t);
+
+			if(!add) return SEQ_ERR_CB;
+
+			seq->cb.add = add;
+		}
+
+		else if(opt == SEQ_CB_REMOVE) {
+			seq_cb_remove_t remove = seq_arg(args, seq_cb_remove_t);
+
+			if(!remove) return SEQ_ERR_CB;
+
+			seq->cb.remove = remove;
+		}
+
+		else return SEQ_ERR_OPT;
+	}
+
+	else return SEQ_ERR_OPT;
+
+	return SEQ_ERR_NONE;
+
+}
+
+seq_opt_t seq_add(seq_t seq, ...) {
+	seq_opt_t r;
 
 	seq_args_wrap(vadd, seq, r);
 
 	return r;
 }
 
-seq_bool_t seq_vadd(seq_t seq, seq_args_t args) {
-	if(seq->impl->add(seq, args)) {
-		seq->size++;
+seq_opt_t seq_vadd(seq_t seq, seq_args_t args) {
+	seq_opt_t r = seq->impl->add(seq, args);
 
-		return SEQ_TRUE;
-	}
+	if(!r) seq->size++;
 
-	return seq_false(seq, "seq_add: failed");
+	return r;
 }
 
-seq_bool_t seq_remove(seq_t seq, ...) {
-	seq_bool_t r = SEQ_FALSE;
+seq_opt_t seq_remove(seq_t seq, ...) {
+	seq_opt_t r;
 
 	seq_args_wrap(vremove, seq, r);
 
 	return r;
 }
 
-seq_bool_t seq_vremove(seq_t seq, seq_args_t args) {
-	if(seq->impl->remove(seq, args)) {
-		seq->size--;
+seq_opt_t seq_vremove(seq_t seq, seq_args_t args) {
+	seq_opt_t r = seq->impl->remove(seq, args);
 
-		return SEQ_TRUE;
-	}
+	if(!r) seq->size--;
 
-	return seq_false(seq, "seq_remove: failed");
+	return r;
 }
 
 seq_get_t seq_get(seq_t seq, ...) {
@@ -99,55 +111,18 @@ seq_get_t seq_vget(seq_t seq, seq_args_t args) {
 	return seq->impl->get(seq, args);
 }
 
-seq_bool_t seq_set(seq_t seq, ...) {
-	seq_bool_t r = SEQ_FALSE;
+seq_opt_t seq_set(seq_t seq, ...) {
+	seq_opt_t r;
 
 	seq_args_wrap(vset, seq, r);
 
 	return r;
 }
 
-seq_bool_t seq_vset(seq_t seq, seq_args_t args) {
-	seq_opt_t set = seq_arg_opt(args);
+seq_opt_t seq_vset(seq_t seq, seq_args_t args) {
+	/* return seq->impl->set(seq, set, args); */
 
-	if(!seq_opt(set, SEQ_SET)) return seq_false(seq, "seq_set: invalid SEQ_SET [%X]", set);
-
-	if(set == SEQ_CB_ADD) {
-		seq_cb_add_t add = seq_arg(args, seq_cb_add_t);
-
-		if(!add) return seq_false(seq, "seq_set: invalid SEQ_CB_ADD");
-
-		seq->cb.add = add;
-	}
-
-	else if(set == SEQ_CB_REMOVE) {
-		seq_cb_remove_t remove = seq_arg(args, seq_cb_remove_t);
-
-		if(!remove) return seq_false(seq, "seq_set: invalid SEQ_CB_REMOVE");
-
-		seq->cb.remove = remove;
-	}
-
-	else if(set == SEQ_CB_REMOVE_FREE) seq->cb.remove = seq_cb_remove_free;
-
-	else if(set == SEQ_CB_ERROR) seq->cb.error = seq_arg(args, seq_cb_error_t);
-
-	else if(set == SEQ_ERROR_STDOUT) seq->cb.error = seq_cb_error_stdout;
-
-	else if(set == SEQ_ERROR_STDERR) seq->cb.error = seq_cb_error_stderr;
-
-	else if(set == SEQ_ERROR_FWRITE) {
-		seq->cb.error = seq_cb_error_fwrite;
-		seq->error.data = seq_arg(args, FILE*);
-	}
-
-	else if(set == SEQ_ERROR_PREFIX) seq->error.prefix = seq_arg(args, const char*);
-
-	else if(set == SEQ_ERROR_POSTFIX) seq->error.postfix = seq_arg(args, const char*);
-
-	else return seq->impl->set(seq, set, args);
-
-	return SEQ_TRUE;
+	return SEQ_ERR_TODO;
 }
 
 seq_opt_t seq_type(seq_t seq) {
@@ -156,6 +131,83 @@ seq_opt_t seq_type(seq_t seq) {
 
 seq_size_t seq_size(seq_t seq) {
 	return seq->size;
+}
+
+static const char* seq_string_type[] = {
+	"TYPE",
+	"LIST",
+	"MAP",
+	"RING",
+	"QUEUE",
+	"STACK",
+	"ARRAY"
+};
+
+static const char* seq_string_add[] = {
+	"ADD",
+	"APPEND",
+	"PREPEND",
+	"BEFORE",
+	"AFTER",
+	"REPLACE",
+	"KEYVAL",
+	"SEND",
+	"PUSH"
+};
+
+static const char* seq_string_get[] = {
+	"GET",
+	"INDEX",
+	"KEY",
+	"RECV",
+	"POP",
+	"DATA"
+};
+
+static const char* seq_string_set[] = {
+	"SET",
+	"CB_ADD",
+	"CB_REMOVE",
+};
+
+static const char* seq_string_iter[] = {
+	"ITER",
+	"READY",
+	"ACTIVE",
+	"STOP",
+	"RANGE",
+	"INC"
+};
+
+static const char* seq_string_compare[] = {
+	"COMPARE",
+	"LESS",
+	"EQUAL",
+	"GREATER"
+};
+
+static const char** seq_string_data[] = {
+	seq_string_type,
+	seq_string_add,
+	seq_string_get,
+	seq_string_set,
+	seq_string_iter,
+	seq_string_compare
+};
+
+const char* seq_string(seq_opt_t opt) {
+	if(opt == SEQ_ERR_NONE) return "ERR_NONE";
+
+	else if(
+		seq_opt(opt, SEQ_TYPE) ||
+		seq_opt(opt, SEQ_CONFIG) ||
+		seq_opt(opt, SEQ_ADD) ||
+		seq_opt(opt, SEQ_GET) ||
+		seq_opt(opt, SEQ_ITER) ||
+		seq_opt(opt, SEQ_COMPARE)
+	) return seq_string_data[((opt & 0x000F0000) >> 16) - 1][seq_opt_val(opt)];
+
+	else return "NULL";
 }
 
 /* =============================================================================== Iteration API */
@@ -200,111 +252,25 @@ seq_get_t seq_iter_vget(seq_iter_t iter, seq_args_t args) {
 	return iter->seq->impl->iter.get(iter, args);
 }
 
-seq_bool_t seq_iter_set(seq_iter_t iter, ...) {
-	seq_bool_t r = SEQ_FALSE;
+seq_opt_t seq_iter_set(seq_iter_t iter, ...) {
+	seq_opt_t r;
 
 	seq_args_wrap(iter_vset, iter, r);
 
 	return r;
 }
 
-seq_bool_t seq_iter_vset(seq_iter_t iter, seq_args_t args) {
+seq_opt_t seq_iter_vset(seq_iter_t iter, seq_args_t args) {
 	return iter->seq->impl->iter.set(iter, args);
 }
 
-seq_bool_t seq_iterate(seq_iter_t iter) {
+seq_opt_t seq_iterate(seq_iter_t iter) {
 	return iter->seq->impl->iter.iterate(iter);
-}
-
-/* =========================================================================== Miscellaneous API */
-
-static const char* seq_string_type[] = {
-	"TYPE",
-	"LIST",
-	"MAP",
-	"RING",
-	"QUEUE",
-	"STACK",
-	"ARRAY"
-};
-
-static const char* seq_string_add[] = {
-	"ADD",
-	"APPEND",
-	"PREPEND",
-	"BEFORE",
-	"AFTER",
-	"REPLACE",
-	"KEYVAL",
-	"SEND",
-	"PUSH"
-};
-
-static const char* seq_string_get[] = {
-	"GET",
-	"INDEX",
-	"KEY",
-	"RECV",
-	"POP",
-	"DATA"
-};
-
-static const char* seq_string_set[] = {
-	"SET",
-	"CB_ADD",
-	"CB_REMOVE",
-	"CB_REMOVE_FREE",
-	"CB_ERROR",
-	"ERROR_STDOUT",
-	"ERROR_STDERR",
-	"ERROR_FWRITE",
-	"ERROR_PREFIX",
-	"ERROR_POSTFIX"
-};
-
-static const char* seq_string_iter[] = {
-	"ITER",
-	"READY",
-	"ACTIVE",
-	"STOP",
-	"RANGE",
-	"INC"
-};
-
-static const char* seq_string_compare[] = {
-	"LESS",
-	"EQUAL",
-	"GREATER"
-};
-
-static const char** seq_string_data[] = {
-	seq_string_type,
-	seq_string_add,
-	seq_string_get,
-	seq_string_set,
-	seq_string_iter,
-	seq_string_compare
-};
-
-const char* seq_string(seq_opt_t opt) {
-	if(opt == SEQ_FALSE) return "FALSE";
-
-	else if(opt == SEQ_TRUE) return "TRUE";
-
-	else if(
-		seq_opt(opt, SEQ_TYPE) ||
-		seq_opt(opt, SEQ_ADD) ||
-		seq_opt(opt, SEQ_GET) ||
-		seq_opt(opt, SEQ_SET) ||
-		seq_opt(opt, SEQ_ITER) ||
-		seq_opt(opt, SEQ_COMPARE)
-	) return seq_string_data[((opt & 0x000F0000) >> 16) - 1][seq_opt_val(opt)];
-
-	else return "NULL";
 }
 
 /* =================================================================================== Debugging */
 
+#if 0
 #define seq_error_args_wrap(start) \
 	va_list args; \
 	va_start(args, start); \
@@ -313,11 +279,9 @@ const char* seq_string(seq_opt_t opt) {
 
 static void seq_verror(seq_t seq, const char* fmt, seq_args_t args) {
 	if(seq->cb.error) {
-		char format[512];
-		char result[1024];
+		char result[512];
 
-		snprintf(format, 512, "%s%s%s\n", seq->error.prefix, fmt, seq->error.postfix);
-		vsnprintf(result, 1024, format, *args);
+		vsprintf(result, fmt, *args);
 
 		seq->cb.error(result, seq->error.data);
 	}
@@ -327,7 +291,7 @@ void seq_error(seq_t seq, const char* fmt, ...) {
 	seq_error_args_wrap(fmt);
 }
 
-seq_bool_t seq_false(seq_t seq, const char* fmt, ...) {
+seq_opt_t seq_false(seq_t seq, const char* fmt, ...) {
 	seq_error_args_wrap(fmt);
 
 	return SEQ_FALSE;
@@ -338,6 +302,7 @@ seq_data_t seq_null(seq_t seq, const char* fmt, ...) {
 
 	return NULL;
 }
+#endif
 
 /* ============================================================================= SEQ_GET Helpers */
 

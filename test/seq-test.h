@@ -37,11 +37,25 @@
 #define TEST_PASS TERM_ESC TERM_GREEN "mPASS" TERM_ESC TERM_RESET "m"
 #define TEST_FAIL TERM_ESC TERM_RED "mFAIL" TERM_ESC TERM_RESET "m"
 
+void test_dbug(const char* msg, seq_data_t data) {
+	printf(" ** [" TEST_DBUG "] %s\n", msg);
+}
+
+void test_info(const char* fmt, ...) {
+	va_list args;
+	char buffer[1024];
+
+	va_start(args, fmt);
+
+	sprintf(buffer, " ++ [" TEST_INFO "] %s\n", fmt);
+	vprintf(buffer, args);
+
+	va_end(args);
+}
+
 #define SEQ_TEST_BEGIN(name) \
 void test_##name(const char* descr) { \
 	seq_t seq = seq_create(SEQ_LIST); \
-	seq_set(seq, SEQ_ERROR_STDOUT); \
-	seq_set(seq, SEQ_ERROR_PREFIX, " ** [" TEST_DBUG "] "); \
 	printf("======================================================================\n"); \
 	printf("test_%s: %s\n", #name, descr); \
 	printf("======================================================================\n"); { \
@@ -58,17 +72,5 @@ void test_##name(const char* descr) { \
 #define SEQ_ASSERT_STRCMP(expr, str) \
 	if(strcmp((expr).data, str)) printf(" >> [" TEST_FAIL "] " #expr " == %s\n", str); \
 	else printf(" >> [" TEST_PASS "] " #expr " == %s\n", str);
-
-void test_info(const char* fmt, ...) {
-	va_list args;
-	char buffer[1024];
-
-	va_start(args, fmt);
-
-	sprintf(buffer, " >> [" TEST_INFO "] %s\n", fmt);
-	vprintf(buffer, args);
-
-	va_end(args);
-}
 
 #endif

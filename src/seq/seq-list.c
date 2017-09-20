@@ -107,15 +107,9 @@ static seq_list_node_get_t seq_list_node_get(seq_t seq, seq_args_t args) {
 }
 
 static seq_data_t seq_list_node_data(seq_t seq, seq_args_t args) {
-	seq_data_t data = NULL;
+	if(!seq->cb.add) return seq_arg_data(args);
 
-	if(!seq->cb.add) data = seq_arg_data(args);
-
-	else data = seq->cb.add(args);
-
-	if(!data) seq_error(seq, "seq_list_add: invalid node data");
-
-	return data;
+	else return seq->cb.add(args);
 }
 
 /* ======================================================================== SEQ_LIST Implementation
@@ -148,113 +142,110 @@ static void seq_list_destroy(seq_t seq) {
 	free(data);
 }
 
-static seq_bool_t seq_list_add(seq_t seq, seq_args_t args) {
+static seq_opt_t seq_list_add(seq_t seq, seq_args_t args) {
 	seq_list_data_t data = seq_list_data(seq);
 	seq_list_node_t node = NULL;
 	seq_opt_t add = seq_arg_opt(args);
+	seq_opt_t err = SEQ_ERR_NONE;
 
-	if(!(node = seq_malloc(seq_list_node_t))) return seq_false(seq, "seq_list_add: malloc failed");
+	if(!(node = seq_malloc(seq_list_node_t))) return SEQ_ERR_MEM;
 
 	if(add == SEQ_APPEND || add == SEQ_PREPEND) {
-		if(!(node->data = seq_list_node_data(seq, args))) goto err;
-
-		/* This is the first node. */
-		if(!data->front && !data->back) {
-			data->front = node;
-			data->back = node;
-		}
-
-		else {
-			if(add == SEQ_APPEND) {
-				node->prev = data->back;
-
-				data->back->next = node;
+		if((node->data = seq_list_node_data(seq, args))) {
+			/* This is the first node. */
+			if(!data->front && !data->back) {
+				data->front = node;
 				data->back = node;
 			}
 
 			else {
-				node->next = data->front;
+				if(add == SEQ_APPEND) {
+					node->prev = data->back;
 
-				data->front->prev = node;
-				data->front = node;
+					data->back->next = node;
+					data->back = node;
+				}
+
+				else {
+					node->next = data->front;
+
+					data->front->prev = node;
+					data->front = node;
+				}
 			}
 		}
+
+		else err = SEQ_ERR_DATA;
 	}
 
 	else if(add == SEQ_BEFORE || add == SEQ_AFTER || add == SEQ_REPLACE) {
-		seq_list_node_t pnode = seq_list_node_get(seq, args).node;
+		seq_list_node_t pnode = NULL;
 
-		if(!pnode) {
-			seq_error(seq, "seq_list_add: invalid previous node");
+		if((pnode = seq_list_node_get(seq, args).node)) {
+			if((node->data = seq_list_node_data(seq, args))) {
+				if(add == SEQ_BEFORE) {
+					node->next = pnode;
+					node->prev = pnode->prev;
 
-			goto err;
+					if(pnode == data->front) data->front = node;
+
+					else pnode->prev->next = node;
+
+					pnode->prev = node;
+				}
+
+				else if(add == SEQ_AFTER) {
+					node->next = pnode->next;
+					node->prev = pnode;
+
+					if(pnode == data->back) data->back = node;
+
+					else pnode->next->prev = node;
+
+					pnode->next = node;
+				}
+
+				else {
+					node->next = pnode->next;
+					node->prev = pnode->prev;
+
+					if(node->next) node->next->prev = node;
+
+					if(node->prev) node->prev->next = node;
+
+					if(pnode == data->front) data->front = node;
+
+					else if(pnode == data->back) data->back = node;
+
+					seq_list_node_destroy(seq, pnode);
+
+					/* TODO: This is a silly hack, since we know the top-level seq_add() will
+					 * increment the size for us (by design). In the case of SEQ_REPLACE however,
+					 * we do not want this. Fixing this will require having the
+					 * implementation-specific functions return something more complex than they
+					 * currently do. */
+					seq->size--;
+				}
+			}
+
+			else err = SEQ_ERR_DATA;
 		}
 
-		if(!(node->data = seq_list_node_data(seq, args))) goto err;
-
-		if(add == SEQ_BEFORE) {
-			node->next = pnode;
-			node->prev = pnode->prev;
-
-			if(pnode == data->front) data->front = node;
-
-			else pnode->prev->next = node;
-
-			pnode->prev = node;
-		}
-
-		else if(add == SEQ_AFTER) {
-			node->next = pnode->next;
-			node->prev = pnode;
-
-			if(pnode == data->back) data->back = node;
-
-			else pnode->next->prev = node;
-
-			pnode->next = node;
-		}
-
-		else {
-			node->next = pnode->next;
-			node->prev = pnode->prev;
-
-			if(node->next) node->next->prev = node;
-
-			if(node->prev) node->prev->next = node;
-
-			if(pnode == data->front) data->front = node;
-
-			else if(pnode == data->back) data->back = node;
-
-			seq_list_node_destroy(seq, pnode);
-
-			/* TODO: This is a silly hack, since we know the top-level seq_add() will increment
-			the size for us (by design). In the case of SEQ_REPLACE however, we do not want
-			this. Fixing this will require having the implementation-specific functions return
-			something more complex than they currently do. */
-			seq->size--;
-		}
+		else err = SEQ_ERR_NODE;
 	}
 
-	else {
-		seq_error(seq, "seq_list_add: invalid SEQ_ADD [0x%08X]", add);
+	else err = SEQ_ERR_OPT;
 
-		goto err;
-	}
+	if(err && node) seq_list_node_destroy(seq, node);
 
-	return SEQ_TRUE;
-
-err:
-	seq_list_node_destroy(seq, node);
-
-	return SEQ_FALSE;
+	return err;
 }
 
-static seq_bool_t seq_list_remove(seq_t seq, seq_args_t args) {
+static seq_opt_t seq_list_remove(seq_t seq, seq_args_t args) {
 	seq_list_data_t data = seq_list_data(seq);
 	seq_list_node_t node = seq_list_node_get(seq, args).node;
 
-	if(!node) return SEQ_FALSE;
+	if(!node) return SEQ_ERR_NODE;
 
 	/* Somewhere in the middle. */
 	if(node->prev && node->next) {
@@ -278,7 +269,7 @@ static seq_bool_t seq_list_remove(seq_t seq, seq_args_t args) {
 
 	seq_list_node_destroy(seq, node);
 
-	return SEQ_TRUE;
+	return SEQ_ERR_NONE;
 }
 
 static seq_get_t seq_list_get(seq_t seq, seq_args_t args) {
@@ -289,8 +280,8 @@ static seq_get_t seq_list_get(seq_t seq, seq_args_t args) {
 	return seq_got_null();
 }
 
-static seq_bool_t seq_list_set(seq_t seq, seq_opt_t set, seq_args_t args) {
-	return SEQ_FALSE;
+static seq_opt_t seq_list_set(seq_t seq, seq_opt_t set, seq_args_t args) {
+	return SEQ_ERR_OPT;
 }
 
 /* ============================================================== SEQ_LIST Iteration Implementation
@@ -302,7 +293,7 @@ static seq_bool_t seq_list_set(seq_t seq, seq_opt_t set, seq_args_t args) {
  * ============================================================================================= */
 
 static void seq_list_iter_create(seq_iter_t iter, seq_args_t args) {
-	seq_opt_t opt = SEQ_FALSE;
+	seq_opt_t opt;
 	seq_list_iter_data_t data = NULL;
 
 	iter->data = seq_malloc(seq_list_iter_data_t);
@@ -344,16 +335,16 @@ static seq_get_t seq_list_iter_get(seq_iter_t iter, seq_args_t args) {
 	return seq_got_null();
 }
 
-static seq_bool_t seq_list_iter_set(seq_iter_t iter, seq_args_t args) {
+static seq_opt_t seq_list_iter_set(seq_iter_t iter, seq_args_t args) {
 	/* seq_list_iter_data_t data = seq_list_iter_data(iter); */
 
-	return SEQ_FALSE;
+	return SEQ_ERR_OPT;
 }
 
-static seq_bool_t seq_list_iter_iterate(seq_iter_t iter) {
+static seq_opt_t seq_list_iter_iterate(seq_iter_t iter) {
 	seq_list_iter_data_t data = seq_list_iter_data(iter);
 
-	if(iter->state == SEQ_STOP) return SEQ_FALSE;
+	if(iter->state == SEQ_STOP) return SEQ_ERR_TODO;
 
 	else if(iter->state == SEQ_READY) {
 		iter->state = SEQ_ACTIVE;
@@ -366,11 +357,11 @@ static seq_bool_t seq_list_iter_iterate(seq_iter_t iter) {
 		for(i = 0; i < data->inc; i++) {
 			data->node = data->node->next;
 
-			if(!data->node) return SEQ_FALSE;
+			if(!data->node) return SEQ_ERR_TODO;
 
 			data->index++;
 		}
 	}
 
-	return SEQ_TRUE;
+	return SEQ_ERR_NONE;
 }

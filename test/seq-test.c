@@ -114,6 +114,7 @@ SEQ_TEST_BEGIN(add_replace)
 	SEQ_ASSERT_STRCMP( seq_get(seq, SEQ_INDEX, 2), "baz" )
 SEQ_TEST_END
 
+#if 0
 SEQ_TEST_BEGIN(remove_free)
 	test_t* t = test_create(1, 2.2f, 33.33, "FOUR");
 
@@ -122,6 +123,7 @@ SEQ_TEST_BEGIN(remove_free)
 	SEQ_ASSERT( seq_remove(seq, SEQ_INDEX, 0) )
 	SEQ_ASSERT( seq_size(seq) == 0)
 SEQ_TEST_END
+#endif
 
 seq_data_t on_add(seq_args_t args) {
 	uint64_t foo = seq_arg(args, uint64_t);
@@ -185,7 +187,7 @@ SEQ_TEST_BEGIN(iterate)
 	test_strings_append(seq);
 
 	{
-		seq_iter_t i = seq_iter_create(seq, SEQ_INC, 3, SEQ_RANGE, 3, 9, SEQ_FALSE);
+		seq_iter_t i = seq_iter_create(seq, SEQ_INC, 3, SEQ_RANGE, 3, 9, SEQ_ERR_TODO);
 
 		while(seq_iterate(i)) {
 			seq_get_t get = seq_iter_get(i, SEQ_DATA);
@@ -213,21 +215,21 @@ typedef struct _test_func_t {
 
 #define TEST_FUNC(name, descr) { test_##name, #name, descr }
 
-const seq_size_t test_funcs_size = 9;
+const seq_size_t test_funcs_size = 8;
 const test_func_t test_funcs[] = {
 	TEST_FUNC(add_append_prepend, "SEQ_APPEND / SEQ_PREPEND"),
 	TEST_FUNC(add_before, "SEQ_BEFORE"),
 	TEST_FUNC(add_after, "SEQ_AFTER"),
 	TEST_FUNC(add_replace, "SEQ_REPLACE"),
-	TEST_FUNC(remove_free, "SEQ_REMOVE_FREE"),
+	/* TEST_FUNC(remove_free, "SEQ_REMOVE_FREE"), */
 	TEST_FUNC(on_add_remove, "SEQ_CB_ADD / SEQ_CB_REMOVE"),
 	TEST_FUNC(on_add_remove_addr, "SEQ_CB_ADD / SEQ_CB_REMOVE"),
 	TEST_FUNC(add_errors, "SEQ_ADD (ERRORS)"),
 	TEST_FUNC(iterate, "SEQ_INC / SEQ_RANGE"),
 };
 
-static seq_bool_t run_tests(const char* str, seq_size_t index, seq_bool_t all) {
-	seq_bool_t any = SEQ_FALSE;
+static seq_opt_t run_tests(const char* str, seq_size_t index, seq_opt_t all) {
+	seq_opt_t any = SEQ_ERR_TODO;
 	seq_size_t i;
 
 	for(i = 0; i < test_funcs_size; i++) {
@@ -236,7 +238,7 @@ static seq_bool_t run_tests(const char* str, seq_size_t index, seq_bool_t all) {
 		if(all || i == index || (str && strstr(tf->name, str))) {
 			tf->func(tf->descr);
 
-			any = SEQ_TRUE;
+			any = SEQ_ERR_NONE;
 		}
 	}
 
@@ -266,14 +268,14 @@ int main(int argc, char** argv) {
 		return 1;
 	}
 
-	else if(argc == 2 && !strcmp(argv[1], "all")) run_tests(NULL, -1, SEQ_TRUE);
+	else if(argc == 2 && !strcmp(argv[1], "all")) run_tests(NULL, -1, SEQ_ERR_NONE);
 
 	else {
 		int a;
 
 		for(a = 1; a < argc; a++) {
 			const char* str = argv[a];
-			seq_bool_t any = run_tests(str, atoi(str) - 1, SEQ_FALSE);
+			seq_opt_t any = run_tests(str, atoi(str) - 1, SEQ_ERR_TODO);
 
 			if(!any) printf("No tests matched your request '%s'.\n", str);
 		}

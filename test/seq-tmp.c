@@ -33,3 +33,44 @@ int main(int argc, char** argv) {
 	return 0;
 }
 
+#if 0
+/* --------------------------------------------------------------------------------------------- */
+seq_add(seq, SEQ_APPEND, "foo");
+seq_add(seq, SEQ_APPEND, "bar");
+seq_add(seq, SEQ_APPEND, "baz");
+
+seq_get_t data = seq_get(seq, SEQ_INDEX, 1).data;
+
+set_set(seq, SEQ_INDEX, 1, "FOO");
+
+/* --------------------------------------------------------------------------------------------- */
+seq_iter_t iter = seq_iter_create(...);
+
+while(seq_iterate(iter)) {
+	seq_get_t g = seq_iter_get(iter);
+
+	printf("g->handle.index = %d\n", g->handle.index);
+	printf("g->data = %p\n", g->data);
+
+	seq_iter_set(g, make_object());
+}
+
+seq_iter_destroy(iter);
+
+/* --------------------------------------------------------------------------------------------- */
+seq_t seq = seq_create(SEQ_MAP);
+seq_iter_t iter0 = seq_iter_create(...);
+seq_iter_t iter1 = seq_iter_create(...);
+
+while(seq_iterate_n(2, iter0, iter1)) {
+	seq_get_t g0 = seq_iter_get(iter0);
+	seq_get_t g1 = seq_iter_get(iter1);
+
+	seq_add(seq, SEQ_KEYVAL, g0->data, g1->data);
+}
+
+seq_iter_destroy(iter0);
+seq_iter_destroy(iter1);
+
+#endif
+
