@@ -47,46 +47,72 @@ SEQ_TYPE_API(list)
 
 /* =========================================================================== Private List Helpers
  * seq_list_index
- * seq_list_node_destroy
- * seq_list_node_get_index
- * seq_list_node_get
+ *    Convert user-specified index into an absolute index, or -1 on error.
+ *
  * seq_list_node_data
+ *    Returns a seq_data_t value for the given user-specified args, calling a seq_cb_add_t
+ *    callback (if set).
+ *
+ * seq_list_node_data_destroy
+ *    Removes the data from the seq_list_node_t, calling a seq_cb_remove_t callback (if set).
+ *
+ * seq_list_node_destroy
+ *    Calls seq_list_node_data_destroy, then subsequently destroys the node itself.
+ *
+ * seq_list_node_get_index
+ *    Returns the seq_list_node_t corresponding to the given index.
+ *
+ * seq_list_node_get
+ *    Returns the seq_list_node_t corresponding to the given user-specified args.
  * ============================================================================================= */
 
-static seq_size_t seq_list_index(seq_t seq, seq_size_t index) {
-	index = index < 0 ? seq->size - abs(index) : index;
+static seq_index_t seq_list_index(seq_t seq, seq_index_t index) {
+	index = index < 0 ? (seq_index_t)(seq->size) - abs(index) : index;
 
-	if(index >= seq->size || index < 0) return -1;
+	if(index >= (seq_index_t)(seq->size) || index < 0) return -1;
 
 	return index;
 }
 
-static void seq_list_node_destroy(seq_t seq, seq_list_node_t node) {
+static seq_data_t seq_list_node_data(seq_t seq, seq_args_t args) {
+	if(!seq->cb.add) return seq_arg_data(args);
+
+	else return seq->cb.add(args);
+}
+
+static void seq_list_node_data_destroy(seq_t seq, seq_list_node_t node) {
 	if(seq->cb.remove) seq->cb.remove(node->data);
+}
+
+static void seq_list_node_destroy(seq_t seq, seq_list_node_t node) {
+	seq_list_node_data_destroy(seq, node);
 
 	free(node);
 }
 
-static seq_list_node_t seq_list_node_get_index(seq_t seq, seq_size_t index) {
+static seq_list_node_t seq_list_node_get_index(seq_t seq, seq_index_t index) {
 	seq_list_data_t data = seq_list_data(seq);
 	seq_list_node_t node = NULL;
 	seq_size_t i;
+	seq_size_t n;
 
 	index = seq_list_index(seq, index);
 
 	if(index >= 0) {
+		i = (seq_size_t)(index);
+
 		/* If the index is PAST the middle of the list, work backwards. */
-		if(index > seq->size / 2) {
+		if(i > seq->size / 2) {
 			node = data->back;
 
-			for(i = 1; i < seq->size - index; i++) node = node->prev;
+			for(n = 1; n < seq->size - index; n++) node = node->prev;
 		}
 
 		/* Otherwise, start from the front. */
 		else {
 			node = data->front;
 
-			for(i = 0; i < index; i++) node = node->next;
+			for(n = 0; n < i; n++) node = node->next;
 		}
 	}
 
@@ -96,7 +122,7 @@ static seq_list_node_t seq_list_node_get_index(seq_t seq, seq_size_t index) {
 static seq_list_node_get_t seq_list_node_get(seq_t seq, seq_args_t args) {
 	seq_list_node_get_t get;
 	seq_opt_t opt = seq_arg_opt(args);
-	seq_size_t index = seq_arg_size(args);
+	seq_size_t index = seq_arg_index(args);
 
 	if(seq_opt(opt, SEQ_GET) && opt == SEQ_INDEX) {
 		get.node = seq_list_node_get_index(seq, index);
@@ -104,12 +130,6 @@ static seq_list_node_get_t seq_list_node_get(seq_t seq, seq_args_t args) {
 	}
 
 	return get;
-}
-
-static seq_data_t seq_list_node_data(seq_t seq, seq_args_t args) {
-	if(!seq->cb.add) return seq_arg_data(args);
-
-	else return seq->cb.add(args);
 }
 
 /* ======================================================================== SEQ_LIST Implementation
@@ -238,6 +258,8 @@ static seq_opt_t seq_list_add(seq_t seq, seq_args_t args) {
 
 	if(err && node) seq_list_node_destroy(seq, node);
 
+	else seq->size++;
+
 	return err;
 }
 
@@ -269,21 +291,40 @@ static seq_opt_t seq_list_remove(seq_t seq, seq_args_t args) {
 
 	seq_list_node_destroy(seq, node);
 
+	seq->size--;
+
 	return SEQ_ERR_NONE;
 }
 
-static seq_get_t seq_list_get(seq_t seq, seq_args_t args) {
+static seq_data_t seq_list_get(seq_t seq, seq_args_t args) {
 	seq_list_node_get_t get = seq_list_node_get(seq, args);
 
-	if(get.node) return seq_got_index(get.node->data, get.index);
+	if(get.node) return get.node->data;
 
-	return seq_got_null();
+	return NULL;
 }
 
-static seq_opt_t seq_list_set(seq_t seq, seq_opt_t set, seq_args_t args) {
-	return SEQ_ERR_OPT;
+static seq_opt_t seq_list_set(seq_t seq, seq_args_t args) {
+	seq_list_node_get_t get = seq_list_node_get(seq, args);
+
+	if(get.node) {
+		seq_data_t data = seq_list_node_data(seq, args);
+
+		if(data) {
+			seq_list_node_data_destroy(seq, get.node);
+
+			get.node->data = data;
+
+			return SEQ_ERR_NONE;
+		}
+
+		else return SEQ_ERR_DATA;
+	}
+
+	else return SEQ_ERR_NODE;
 }
 
+#if 0
 /* ============================================================== SEQ_LIST Iteration Implementation
  * seq_list_iter_create
  * seq_list_iter_destroy
@@ -365,3 +406,4 @@ static seq_opt_t seq_list_iter_iterate(seq_iter_t iter) {
 
 	return SEQ_ERR_NONE;
 }
+#endif

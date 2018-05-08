@@ -76,11 +76,7 @@ seq_opt_t seq_add(seq_t seq, ...) {
 }
 
 seq_opt_t seq_vadd(seq_t seq, seq_args_t args) {
-	seq_opt_t r = seq->impl->add(seq, args);
-
-	if(!r) seq->size++;
-
-	return r;
+	return seq->impl->add(seq, args);
 }
 
 seq_opt_t seq_remove(seq_t seq, ...) {
@@ -92,22 +88,18 @@ seq_opt_t seq_remove(seq_t seq, ...) {
 }
 
 seq_opt_t seq_vremove(seq_t seq, seq_args_t args) {
-	seq_opt_t r = seq->impl->remove(seq, args);
-
-	if(!r) seq->size--;
-
-	return r;
+	return seq->impl->remove(seq, args);
 }
 
-seq_get_t seq_get(seq_t seq, ...) {
-	seq_get_t get;
+seq_data_t seq_get(seq_t seq, ...) {
+	seq_data_t get;
 
 	seq_args_wrap(vget, seq, get);
 
 	return get;
 }
 
-seq_get_t seq_vget(seq_t seq, seq_args_t args) {
+seq_data_t seq_vget(seq_t seq, seq_args_t args) {
 	return seq->impl->get(seq, args);
 }
 
@@ -120,9 +112,7 @@ seq_opt_t seq_set(seq_t seq, ...) {
 }
 
 seq_opt_t seq_vset(seq_t seq, seq_args_t args) {
-	/* return seq->impl->set(seq, set, args); */
-
-	return SEQ_ERR_TODO;
+	return seq->impl->set(seq, args);
 }
 
 seq_opt_t seq_type(seq_t seq) {
@@ -141,6 +131,14 @@ static const char* seq_string_type[] = {
 	"QUEUE",
 	"STACK",
 	"ARRAY"
+};
+
+static const char* seq_string_config[] = {
+	"CONFIG",
+	"CB_ADD",
+	"CB_REMOVE",
+	"SORTED",
+	"BLOCKING"
 };
 
 static const char* seq_string_add[] = {
@@ -164,12 +162,6 @@ static const char* seq_string_get[] = {
 	"DATA"
 };
 
-static const char* seq_string_set[] = {
-	"SET",
-	"CB_ADD",
-	"CB_REMOVE",
-};
-
 static const char* seq_string_iter[] = {
 	"ITER",
 	"READY",
@@ -179,24 +171,35 @@ static const char* seq_string_iter[] = {
 	"INC"
 };
 
-static const char* seq_string_compare[] = {
-	"COMPARE",
+static const char* seq_string_cmp[] = {
+	"CMP",
 	"LESS",
 	"EQUAL",
 	"GREATER"
 };
 
+static const char* seq_string_err[] = {
+	"ERR",
+	"ERR_OPT",
+	"ERR_MEM",
+	"ERR_DATA",
+	"ERR_NODE",
+	"ERR_CB",
+	"ERR_TODO"
+};
+
 static const char** seq_string_data[] = {
 	seq_string_type,
+	seq_string_config,
 	seq_string_add,
 	seq_string_get,
-	seq_string_set,
 	seq_string_iter,
-	seq_string_compare
+	seq_string_cmp,
+	seq_string_err
 };
 
 const char* seq_string(seq_opt_t opt) {
-	if(opt == SEQ_ERR_NONE) return "ERR_NONE";
+	if(!opt) return "ERR_NONE";
 
 	else if(
 		seq_opt(opt, SEQ_TYPE) ||
@@ -204,12 +207,14 @@ const char* seq_string(seq_opt_t opt) {
 		seq_opt(opt, SEQ_ADD) ||
 		seq_opt(opt, SEQ_GET) ||
 		seq_opt(opt, SEQ_ITER) ||
-		seq_opt(opt, SEQ_COMPARE)
+		seq_opt(opt, SEQ_CMP) ||
+		seq_opt(opt, SEQ_ERR)
 	) return seq_string_data[((opt & 0x000F0000) >> 16) - 1][seq_opt_val(opt)];
 
-	else return "NULL";
+	else return "";
 }
 
+#if 0
 /* =============================================================================== Iteration API */
 
 seq_iter_t seq_iter_create(seq_t seq, ...) {
@@ -267,6 +272,7 @@ seq_opt_t seq_iter_vset(seq_iter_t iter, seq_args_t args) {
 seq_opt_t seq_iterate(seq_iter_t iter) {
 	return iter->seq->impl->iter.iterate(iter);
 }
+#endif
 
 /* =================================================================================== Debugging */
 
@@ -303,29 +309,3 @@ seq_data_t seq_null(seq_t seq, const char* fmt, ...) {
 	return NULL;
 }
 #endif
-
-/* ============================================================================= SEQ_GET Helpers */
-
-static seq_get_t seq_got(seq_data_t data, seq_data_t key, seq_size_t index) {
-	seq_get_t get;
-
-	get.data = data;
-
-	if(key) get.handle.key = key;
-
-	else get.handle.index = index;
-
-	return get;
-}
-
-seq_get_t seq_got_index(seq_data_t data, seq_size_t index) {
-	return seq_got(data, NULL, index);
-}
-
-seq_get_t seq_got_key(seq_data_t data, seq_data_t key) {
-	return seq_got(data, key, 0);
-}
-
-seq_get_t seq_got_null() {
-	return seq_got(NULL, NULL, 0);
-}

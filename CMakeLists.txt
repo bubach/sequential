@@ -27,6 +27,10 @@ IF(SEQUENTIAL_STATIC)
 	SET(SEQUENTIAL_LIBRARY_TYPE STATIC)
 ENDIF()
 
+IF(NOT WIN32)
+	SET(CMAKE_C_FLAGS "-W -Wall -Wno-unused-parameter -std=c90 -pedantic")
+ENDIF(NOT WIN32)
+
 ADD_LIBRARY(sequential ${SEQUENTIAL_LIBRARY_TYPE}
 	${SEQUENTIAL_HEADER_FILES}
 	${SEQUENTIAL_SOURCE_FILES}
@@ -36,9 +40,11 @@ IF(NOT WIN32)
 	TARGET_LINK_LIBRARIES(sequential dl)
 ENDIF()
 
-ADD_EXECUTABLE(seq-test "test/seq-test.h" "test/seq-test.c")
-TARGET_LINK_LIBRARIES(seq-test sequential)
+# ADD_EXECUTABLE(seq-test "test/seq-test.h" "test/seq-test.c")
+# TARGET_LINK_LIBRARIES(seq-test sequential)
 
 ADD_EXECUTABLE(seq-tmp "test/seq-tmp.c")
 TARGET_LINK_LIBRARIES(seq-tmp sequential)
 
+ADD_EXECUTABLE(seq-test-string "test/seq-test-string.c")
+TARGET_LINK_LIBRARIES(seq-test-string sequential)

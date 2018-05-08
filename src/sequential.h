@@ -13,16 +13,16 @@ extern "C" {
 
 #include <stdarg.h>
 #include <stdint.h>
+#include <stddef.h>
 
 /* ======================================================================== Types, Constants, Enums
  * SEQ_VERSION
  * seq_t
  * seq_opt_t
  * seq_size_t
+ * seq_index_t
  * seq_args_t
  * seq_data_t
- * seq_ref_t
- * seq_get_t
  * seq_cb_add_t
  * seq_cb_remove_t
  * ============================================================================================= */
@@ -40,27 +40,12 @@ typedef struct _seq_iter_t* seq_iter_t;
 /* Throughout Sequential, anytime a SEQ_* constant is expected, seq_opt_t is used to manage it. */
 typedef uint32_t seq_opt_t;
 
-/* Sequential uses int64_t (rather than size_t) for its sizing and indexing API. This allows the
- * use of negative indices, indicating that the collection should be accessed/traversed in
- * reverse. */
-typedef int32_t seq_size_t;
+typedef size_t seq_size_t;
+
+typedef int64_t seq_index_t;
 
 typedef va_list* seq_args_t;
 typedef void* seq_data_t;
-typedef const void* seq_ref_t;
-
-/* This structure is a special type returned by any of the "getter" routines within the Sequential
- * library. It includes not only the data component, but the handle by which that data is retrieved.
- * In most cases this is the numeric index of the node containing the data, but when using a SEQ_MAP
- * instance, this could be any arbitrary type. */
-typedef struct _seq_get_t {
-	seq_ref_t data;
-
-	union {
-		seq_size_t index;
-		seq_ref_t key;
-	} handle;
-} seq_get_t;
 
 #define SEQ_TYPE 0x11110000
 #define SEQ_LIST (SEQ_TYPE | 0x0001)
@@ -75,7 +60,8 @@ typedef struct _seq_get_t {
 #define SEQ_CB_ADD (SEQ_CONFIG | 0x0001)
 #define SEQ_CB_REMOVE (SEQ_CONFIG | 0x0002)
 #define SEQ_SORTED (SEQ_CONFIG | 0x0003)
-#define SEQ_CONFIG_MAX SEQ_SORTED
+#define SEQ_BLOCKING (SEQ_CONFIG | 0x0004)
+#define SEQ_CONFIG_MAX SEQ_BLOCKING
 
 #define SEQ_ADD 0x33330000
 #define SEQ_APPEND (SEQ_ADD | 0x0001)
@@ -104,11 +90,11 @@ typedef struct _seq_get_t {
 #define SEQ_INC (SEQ_ITER | 0x0005)
 #define SEQ_ITER_MAX SEQ_INC
 
-#define SEQ_COMPARE 0x66660000
-#define SEQ_LESS (SEQ_COMPARE | 0x0001)
-#define SEQ_EQUAL (SEQ_COMPARE | 0x0002)
-#define SEQ_GREATER (SEQ_COMPARE | 0x0003)
-#define SEQ_COMPARE_MAX SEQ_GREATER
+#define SEQ_CMP 0x66660000
+#define SEQ_LESS (SEQ_CMP | 0x0001)
+#define SEQ_EQUAL (SEQ_CMP | 0x0002)
+#define SEQ_GREATER (SEQ_CMP | 0x0003)
+#define SEQ_CMP_MAX SEQ_GREATER
 
 #define SEQ_ERR 0x77770000
 #define SEQ_ERR_NONE 0
@@ -118,12 +104,12 @@ typedef struct _seq_get_t {
 #define SEQ_ERR_NODE (SEQ_ERR | 0x0004)
 #define SEQ_ERR_CB (SEQ_ERR | 0x0005)
 #define SEQ_ERR_TODO (SEQ_ERR | 0x0006)
-#define SEQ_ERR_MAX SEQ_ERR_MEM
+#define SEQ_ERR_MAX SEQ_ERR_TODO
 
 /* The seq_cb_add_t type defines the signature of an optional callback that will be used internally
- * by the seq_t instance when seq_add() is called. It is passed the remainder of the argument list
- * occurring after the seq_t instance itself; e.g., seq_add(seq, SEQ_APPEND, 1, 2, 3) would forward
- * the (SEQ_APPEND, 1, 2, 3) portion of the va_list to the callback function.
+ * by the seq_t instance when seq_add() is called, and is passed the remainder of the argument list
+ * corresponding to the data being added. For example, seq_add(seq, SEQ_APPEND, 1, 2, 3) would
+ * forward the (1, 2, 3) portion of the va_list to the callback function.
  *
  * This callback must return a seq_data_t value that will be bound internally to the current
  * node/element. */
@@ -134,11 +120,11 @@ typedef seq_data_t (*seq_cb_add_t)(seq_args_t args);
  * the value returned from the seq_cb_add_t callback, if set). */
 typedef void (*seq_cb_remove_t)(seq_data_t data);
 
-/* TODO: Returns one of the SEQ_COMPARE values. */
-typedef seq_opt_t (*seq_cb_compare_t)(seq_t seq, seq_data_t lhs, seq_data_t rhs);
+/* TODO: Returns one of the SEQ_CMP values. */
+typedef seq_opt_t (*seq_cb_cmp_t)(seq_t seq, seq_data_t lhs, seq_data_t rhs);
 
 #define seq_arg(args, type) va_arg(*args, type)
-#define seq_arg_size(args) va_arg(*args, seq_size_t)
+#define seq_arg_index(args) va_arg(*args, seq_index_t)
 #define seq_arg_data(args) va_arg(*args, seq_data_t)
 #define seq_arg_opt(args) va_arg(*args, seq_opt_t)
 
@@ -152,6 +138,15 @@ typedef seq_opt_t (*seq_cb_compare_t)(seq_t seq, seq_data_t lhs, seq_data_t rhs)
  * seq_set
  * seq_type
  * seq_size
+ *
+ * TODO:
+ *
+ * seq_sort OR seq_config(SEQ_SORT)
+ * seq_find
+ * seq_flatten OR seq_config(SEQ_FLATTEN)
+ * seq_create_from
+ * seq_lock
+ * seq_unlock
  * ============================================================================================= */
 
 /* Creates a new, empty seq_t instance using the implementation defined by the type argument.
@@ -180,14 +175,8 @@ SEQ_API seq_opt_t seq_vadd(seq_t seq, seq_args_t args);
 SEQ_API seq_opt_t seq_remove(seq_t seq, ...);
 SEQ_API seq_opt_t seq_vremove(seq_t seq, seq_args_t args);
 
-/* Retrieves and encapsulates the data contained within the specified node. This data is contained
- * within a seq_get_t structure which provides both the expected data AND the handle by which that
- * data is stored. Furthermore, all members of the seq_get_t structure are const, preventing the
- * caller from directly modifying an element within a seq_t instance. Just as with seq_add() and
- * seq_remove(), the internal instance implementation will determine the exact manner in which this
- * routine is used. */
-SEQ_API seq_get_t seq_get(seq_t seq, ...);
-SEQ_API seq_get_t seq_vget(seq_t seq, seq_args_t args);
+SEQ_API seq_data_t seq_get(seq_t seq, ...);
+SEQ_API seq_data_t seq_vget(seq_t seq, seq_args_t args);
 
 /* Allows the caller to modify an exisiting node within the sequence in a threadsafe, optimized
  * manner, behaving as a kind of union between the seq_get() and seq_add() routines. */
@@ -204,6 +193,7 @@ SEQ_API seq_size_t seq_size(seq_t seq);
  * representation, omitting the leading "SEQ_" prefix. */
 SEQ_API const char* seq_string(seq_opt_t opt);
 
+#if 0
 /* ================================================================================== Iteration API
  * seq_iter_create
  * seq_iter_destroy
@@ -224,6 +214,7 @@ SEQ_API seq_opt_t seq_iter_set(seq_iter_t iter, ...);
 SEQ_API seq_opt_t seq_iter_vset(seq_iter_t iter, seq_args_t args);
 
 SEQ_API seq_opt_t seq_iterate(seq_iter_t iter);
+#endif
 
 #ifdef __cplusplus
 }
